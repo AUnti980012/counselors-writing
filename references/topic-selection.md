@@ -2,6 +2,19 @@
 
 辅导员「不知道写什么」的根子，是没有把「工作素材」翻译成「学生关心的东西」和「有张力的矛盾冲突」。本文给一套固定打法：**五角度框架 + 三步法**，任何素材都能稳定产出选题。
 
+## 命令化与数据边界（先读这个）
+
+选题转化在 V2 已命令化，三个命令各司其职，别混用：
+
+| 命令 | 产出 | 说明 |
+|---|---|---|
+| `kb.py extract <doc> --extractor topic_signal` | **TopicRecord**（选题卡） | 从素材生成选题卡（五角度 + 标题三式 + hook + value_landing）。本文「三步法」就是它的 prompt 语义 |
+| `kb.py search topic <kw>` | 检索 | **只检索**已有 TopicRecord，不生成新选题 |
+| `kb.py analysis --case <id> [--case <id2>]` | **AnalysisRecord** | 案例对比分析（学生关心什么 / 核心冲突 / 角度匹配），是独立实体，与 TopicRecord 不同 |
+
+- **AnalysisRecord**（`analysis` 命令）回答「学生真正关心什么 / 核心冲突是什么 / 五角度匹配打分」；**TopicRecord**（`topic_signal` 提取器）才是落到 `data/schemas/topic.schema.json` 的选题卡（五角度 + 标题三式 + hook + value_landing）。
+- 无 LLM CLI 时：`--prompt-only` 拿 prompt → Agent 产出 JSON → `--result` 回灌（见 `docs/integration/agent-integration.md`）。
+
 ## 一、五角度框架
 
 五个切入角度，每个角度记住四要素：**定义 / 素材特征 / 标题句式 / 常见误区**。

@@ -40,7 +40,7 @@
 
 ## 4. 事实/推断硬规则
 
-见 `docs/data-contract.md` §6。要点：事实类（documented_fact/source_claim）缺 evidence_ids、AI 类（ai_inference/derived_pattern/recommendation）缺 basis → Pydantic model_validator 直接拒绝，错误为路径级（如 `documented_facts.0.evidence_ids`），供 M4 自纠正循环（≤2 次）消费。
+见 `docs/architecture/data-contract.md` §6。要点：事实类（documented_fact/source_claim）缺 evidence_ids、AI 类（ai_inference/derived_pattern/recommendation）缺 basis → Pydantic model_validator 直接拒绝，错误为路径级（如 `documented_facts.0.evidence_ids`），供 M4 自纠正循环（≤2 次）消费。
 
 ## 5. 枚举（权威列表在 common.json `enums`）
 
@@ -63,5 +63,5 @@
   → python -m unittest discover -s scripts/tests -t scripts（全绿）
   → python scripts/kb.py schemas export（重新导出）
   → git diff data/schemas/（审查导出 diff；本仓库非 git 时人工比对 export --check）
-  → schema_version 按语义化版本递增 + 更新 docs/data-contract.md
+  → schema_version 按语义化版本递增 + 更新 docs/architecture/data-contract.md
 ```

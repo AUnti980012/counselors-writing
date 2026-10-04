@@ -1,7 +1,7 @@
 # Data Contract（数据契约）
 
 > pack M1 STEP 17 交付物。权威定义 = `scripts/core/schema.py`（Pydantic 单一真相源）；`data/schemas/*.json` 为导出的机器可读契约文档（禁止手改）。本文档说明实体关系、所有权、生命周期与迁移规则。
-> 契约版本：schema_version 1.0.0（2026-09-30 冻结）。变更流程见 `docs/schema-conventions.md`。
+> 契约版本：schema_version 1.0.0（2026-09-30 冻结）。变更流程见 `docs/architecture/schema-conventions.md`。
 
 ## 1. 实体总表（16 + common）
 
@@ -81,7 +81,7 @@ extraction ──input_refs/output_refs── 提取上下游
 
 ## 7. Storage Responsibilities（PERSISTENCE RULE）
 
-> 2026-09-30 更新：以下存储层已在 **M2/M3 实现**，实现细节与失效策略见 `docs/storage-architecture.md`。
+> 2026-09-30 更新：以下存储层已在 **M2/M3 实现**，实现细节与失效策略见 `docs/architecture/storage-architecture.md`。
 
 | 存储 | 角色 | 说明 |
 |---|---|---|

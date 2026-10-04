@@ -1,7 +1,7 @@
 # Storage Architecture（存储架构）
 
 > pack M2 STEP 10 交付物（M6 起持续更新）。对应实现：`scripts/core/{atomic,artifact,cache,db,repo,search,hashing,urlutil,fetcher,preprocess,chunker,pipeline,hotlist,compat,extract,analysis,mapping,profile,writer,audit,punctuation,output}.py`。
-> 与 `docs/data-contract.md` 的分工：本文件讲「存储怎么实现」；data-contract 讲「数据怎么定义」。
+> 与 `docs/architecture/data-contract.md` 的分工：本文件讲「存储怎么实现」；data-contract 讲「数据怎么定义」。
 
 ## 1. 总览（四层存储）
 
@@ -284,16 +284,16 @@ kb.py output render --draft <id>           draft → FINAL artifact（permanent�
 ## 18. 数据生命周期：备份 + 恢复 + 保留 + GC（M7）
 
 `core/task.py`（16 态状态机）+ `core/backup.py`（在线快照）+ `core/gc.py`（引用感知 GC）
-+ db migration v3（tasks/task_events/backups 表）。完整文档见 `docs/data-lifecycle.md`，
++ db migration v3（tasks/task_events/backups 表）。完整文档见 `docs/architecture/data-lifecycle.md`，
 本节只列与存储架构的交叉点：
 
 - **tasks/task_events/backups 是运行态表**（非 canonical 内容）：`rebuild_index` 不删这三张表，
   tasks 是中断恢复依据（context_refs 锚点）、backups 是恢复登记。
 - **备份对象 = index.db**（在线快照 `Connection.backup`），canonical knowledge 是内容权威、
-  可随时重建索引，故不打包整仓库（`docs/data-lifecycle.md` §2-3）。
+  可随时重建索引，故不打包整仓库（`docs/architecture/data-lifecycle.md` §2-3）。
 - **GC 引用感知**：删除 artifact 前构建存活引用集合 = registry 血缘（source_ids/parent_ids）
   ∪ tasks 表引用（input_refs/output_refs/context_refs[kind=artifact]）；`permanent` 永不候选，
-  `data/knowledge/` 永不触碰（`docs/data-lifecycle.md` §4）。
+  `data/knowledge/` 永不触碰（`docs/architecture/data-lifecycle.md` §4）。
 - **cache purge 复用**：GC 的 cache 部分直接调 `CacheManager.purge`（默认 dry-run，只删
   `status=expired`，孤儿 `.bin` 只报不删）。
 - **已知限制（GC 保守性）**：`collect_references` 遍历 registry 全部 latest 记录（含已

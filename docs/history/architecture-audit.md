@@ -141,7 +141,7 @@ fudaoyuan-baokuan/
 - **两道门**：标点（Python 字符级，硬门禁）+ 第二意见（MCP，硬依赖，有降级但丢失独立复核）——**用户已决策删除第二意见**。
 - **回写纪律**：复盘后回写案例库+风格库；source_material 必须脱敏（仅文档纪律，脚本零校验）。
 - **追加式存储**：cases.jsonl「永不整体重写」——数据只增不减，无 update/delete/GC。
-- **已知缺陷清单**：详见 `docs/architecture-gaps.md`（23 组 gap，G-01~G-23）与 `docs/token-boundary-audit.md`（Top 10 热点）；8 条 critical/high findings 证据见 `docs/migration-plan.md` 附录。
+- **已知缺陷清单**：详见 `docs/history/architecture-gaps.md`（23 组 gap，G-01~G-23）与 `docs/history/token-boundary-audit.md`（Top 10 热点）；8 条 critical/high findings 证据见 `docs/history/migration-plan.md` 附录。
 
 ## 7. 组件职责总表
 

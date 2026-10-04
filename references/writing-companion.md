@@ -16,8 +16,8 @@
 1. **逐段写**：一段一段产出，每段写完**不要立刻往下写**。
 2. **逐段自查**：对照 `references/ideological-review.md` 里「逐段相关」的项查这一段——重点是**政治方向、学生隐私、标签化语言、AI 痕迹**；事实依据 / 价值表达 / 版权风险放到全文级再查。发现问题就地改，不带病进下一段。
 3. **全文初稿后过门**：
-   - 标点门禁（确定性，零 LLM）：`python3 scripts/kb.py punctuation --lang zh <file>`（exit 0 = 通过 / 1 = 有 findings / 2 = ko 暂不支持）。
-   - 思政七项结构化自查：`python3 scripts/kb.py audit --draft <draft_id> --llm-cmd "claude -p"`（见 `references/ideological-review.md`）。
+   - 标点门禁（确定性，零 LLM）：`python3 scripts/kb.py punctuation --lang zh <file>`（exit 0 = 通过 / 2 = 有 findings 或 ko 暂不支持）。
+   - 思政七项结构化自查：`python3 scripts/kb.py audit --draft <draft_id> --llm-cmd "<LLM_COMMAND>"`（或 `--prompt-only`/`--result` 由 Agent 编排；见 `references/ideological-review.md`）。
 4. **汇总输出**：七项自查结果 + 标点门禁合并成质检报告（模板 `assets/review-report-template.md`，单栏），给「通过 / 需修改（列必改项）/ 不通过」，把修改落实进正文后再交付。
 
 ## 三、可选增强（不作为默认依赖）

@@ -16,8 +16,8 @@ from core.chunker import chunk_text
 from core.extract import (ExtractionDeps, ExtractionInputError, LLMCallError,
                           build_extraction_prompt, entity_id_for,
                           estimate_tokens, extract, extraction_cache_key,
-                          extraction_id_for, llm_fn_from_cmd, parse_llm_json,
-                          schema_summary)
+                          extraction_id_for, llm_fn_from_cmd, llm_fn_from_file,
+                          parse_llm_json, schema_summary)
 from core.hashing import content_hash
 from core.repo import Repository
 from core.schema import ChunkRecord, DocumentRecord, SCHEMA_VERSION
@@ -477,6 +477,85 @@ class ExtractTests(unittest.TestCase):
     def _all_chunks(self):
         doc = self.repo.get_document("doc-test123")
         return [self.repo.get_record("chunk", cid) for cid in doc.chunk_ids]
+
+
+class AgentAdapterResultTests(unittest.TestCase):
+    """M10 Agent Adapter Contract：--result 回灌复用既有 parse→inject→validate→persist 路径。
+
+    llm_fn_from_file 等价于 kb.py --result <file>（读 Agent 已产出的 JSON，不调用模型）。
+    独立 setUp（临时 repo + document + 空 cache），不继承 ExtractTests 以免重复跑其用例。
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.conn = db.connect(root / "t.db")
+        db.init_db(self.conn)
+        self.repo = Repository(self.conn, root / "knowledge", root / "seed.json")
+        self.store = ArtifactStore(root / "artifacts",
+                                   Registry(root / "registry" / "artifacts.jsonl"),
+                                   index_sync=self.repo.upsert_artifact)
+        self.cache = CacheManager(root=root / "cache")
+        self.deps = ExtractionDeps(repo=self.repo, store=self.store,
+                                   cache=self.cache, conn=self.conn)
+        self.digest = _make_document(self.repo, CASE_BODY)
+
+    def tearDown(self):
+        self.conn.close()
+        self.tmp.cleanup()
+
+    def _write_result_file(self, content: str) -> str:
+        p = Path(self.tmp.name) / "result.json"
+        p.write_text(content, encoding="utf-8")
+        return str(p)
+
+    def test_llm_fn_from_file_returns_content(self):
+        path = self._write_result_file(json.dumps(VALID_CASE, ensure_ascii=False))
+        fn = llm_fn_from_file(path)
+        self.assertEqual(fn("ignored prompt"), json.dumps(VALID_CASE, ensure_ascii=False))
+
+    def test_llm_fn_from_file_missing_raises(self):
+        fn = llm_fn_from_file(str(Path(self.tmp.name) / "nope.json"))
+        with self.assertRaises(LLMCallError):
+            fn("ignored")
+
+    def test_llm_fn_from_file_empty_raises(self):
+        path = self._write_result_file("")
+        fn = llm_fn_from_file(path)
+        with self.assertRaises(LLMCallError):
+            fn("ignored")
+
+    def test_result_file_reenters_persist_path(self):
+        """--result 回灌：与 --llm-cmd 同一条落盘路径（knowledge + artifact + 索引）。"""
+        path = self._write_result_file(json.dumps(VALID_CASE, ensure_ascii=False))
+        ptr = extract(extractor="case_facts", document_id="doc-test123",
+                      llm_fn=llm_fn_from_file(path), deps=self.deps)
+        self.assertEqual(ptr["status"], "success")
+        case = self.repo.get_case(entity_id_for("case", self.digest))
+        self.assertIsNotNone(case)
+        self.assertEqual(case.title, "一次班会的三个提问")
+        rec = self.store.get(ptr["artifact_id"])
+        self.assertEqual(rec.artifact_type, "extraction")
+
+    def test_result_file_idempotent_no_duplicate(self):
+        """同一 result 文件二次回灌 → cache 短路，不产生重复 artifact。"""
+        path = self._write_result_file(json.dumps(VALID_CASE, ensure_ascii=False))
+        ptr1 = extract(extractor="case_facts", document_id="doc-test123",
+                       llm_fn=llm_fn_from_file(path), deps=self.deps)
+        ptr2 = extract(extractor="case_facts", document_id="doc-test123",
+                       llm_fn=llm_fn_from_file(path), deps=self.deps)
+        self.assertTrue(ptr2["reused"])
+        self.assertEqual(ptr1["extraction_id"], ptr2["extraction_id"])
+        self.assertEqual(ptr1["artifact_id"], ptr2["artifact_id"])
+
+    def test_invalid_result_rejected(self):
+        """非法 result（非 JSON）→ 被既有校验路径拒绝，不落 knowledge。"""
+        path = self._write_result_file("{ 这不是合法 JSON")
+        ptr = extract(extractor="case_facts", document_id="doc-test123",
+                      llm_fn=llm_fn_from_file(path), deps=self.deps)
+        self.assertEqual(ptr["status"], "extraction_failed")
+        self.assertFalse(self.repo.has_record(
+            "case", entity_id_for("case", self.digest)))
 
 
 if __name__ == "__main__":

@@ -27,14 +27,14 @@
 
 ## D. Intentional feature changes（有意变更，C-01~C-09）
 
-见 `docs/migration-plan.md` 第 2 节：xinbang 移除、抖音结构化+登录门禁、标点 ko exit 2、case `--top 0` 钳制、style `--top` 上限、profile 白名单、思政第二意见删除、案例写入路径（文件权威+独立镜像）、标点 4 规则修复。
+见 `docs/history/migration-plan.md` 第 2 节：xinbang 移除、抖音结构化+登录门禁、标点 ko exit 2、case `--top 0` 钳制、style `--top` 上限、profile 白名单、思政第二意见删除、案例写入路径（文件权威+独立镜像）、标点 4 规则修复。
 
 ## E. Remaining technical debt（剩余技术债）
 
 - draft/audit/effect 的检索索引（当前 canonical-only 文件扫描）。
 - task 状态机与各管道模块的 `--task` 接线（M7 只建状态机，未逐模块挂 task_id 锚点）。
 - 真实数据导入 + 端到端 smoke（见 B）。
-- `docs/token-boundary-audit.md` 的 V1 基线数字为量级估算，未逐条实测（已声明）。
+- `docs/history/token-boundary-audit.md` 的 V1 基线数字为量级估算，未逐条实测（已声明）。
 
 ## F. Regression risks（回归风险，不声称零风险）
 
@@ -65,4 +65,4 @@
 2. draft/audit/effect 检索索引（数据量增长后）。
 3. task 状态机接线各管道（`--task` 锚点贯穿）。
 4. slash commands 9 条薄包装（如团队用 slash 习惯）。
-5. `docs/token-boundary-audit.md` 实测化（真实场景 token 计数替代估算）。
+5. `docs/history/token-boundary-audit.md` 实测化（真实场景 token 计数替代估算）。

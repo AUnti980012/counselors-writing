@@ -17,10 +17,10 @@
   hotlist weibo|tophub [--top N]  热榜抓取（输出 JSON [{rank,title,heat,url}]，与 V1 一致）
   extract <document_id> --extractor case_facts|style_pattern|topic_signal
                                    LLM 提取→校验→自纠正→knowledge/artifact
-                                   （--llm-cmd 外部命令，或 --prompt-only 由 Agent 编排）
+                                   （三模式：--llm-cmd / --prompt-only / --result 回灌）
   context-for-write --mapping <id> 打印写作上下文包（白名单审计输出，Token 检查点 E）
-  write --mapping <id>             LLM 写作→DraftRecord（白名单输入，--llm-cmd/--prompt-only）
-  audit --draft <id>               LLM 七项自查+标点门禁→AuditRecord（单通道，C-07）
+  write --mapping <id>             LLM 写作→DraftRecord（白名单输入，三模式）
+  audit --draft <id>               LLM 七项自查+标点门禁→AuditRecord（单通道，C-07；三模式）
   punctuation [FILE]              标点门禁（确定性，零 LLM；C-03/C-09）
   output render --draft <id>       draft→最终 Markdown→FINAL artifact（零 LLM，换格式重渲染）
   task create/status/transition/resume/retry/events/batch   16 态任务状态机（非法迁移拒绝）
@@ -51,13 +51,32 @@ except ImportError as exc:  # 依赖缺失（pydantic 未安装）
     print("安装指引：python -m pip install 'pydantic>=2'", file=sys.stderr)
     sys.exit(EXIT_DEPENDENCY)
 
-KB_VERSION = "0.9.0"  # M8：加固+兼容+回归（compat CDP 后端 + test 门禁）
+KB_VERSION = "0.10.0"  # M10：Agent Adapter Contract（--result 回灌，统一三模式）
 
 ENTITY_NAMES = sorted(ENTITIES)
 
 
 def _print_json(obj) -> None:
     print(json.dumps(obj, ensure_ascii=False, indent=2, default=str))
+
+
+def _llm_fn(args: argparse.Namespace):
+    """--llm-cmd / --result 二选一 → llm_fn；两者都缺返回 None（--prompt-only 由上层分支处理）。
+
+    --result 用 llm_fn_from_file（读 Agent 已产出的 JSON 文件），与 --llm-cmd
+    走完全相同的 parse → inject → validate → persist 路径，不复制写入逻辑。
+    """
+    from core.extract import llm_fn_from_cmd, llm_fn_from_file
+
+    if getattr(args, "result", None):
+        return llm_fn_from_file(args.result)
+    if getattr(args, "llm_cmd", None):
+        return llm_fn_from_cmd(args.llm_cmd)
+    return None
+
+
+_MODE_ERR = ("错误：需要 --llm-cmd '<命令>'、--result <文件> 之一（不调用模型、只回灌 JSON），"
+             "或 --prompt-only 只输出 prompt 由 Agent 编排")
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -433,11 +452,13 @@ def cmd_extract(args: argparse.Namespace) -> int:
     """LLM 结构化提取（pack M4）：document → 提取 → 校验 → 自纠正 → knowledge/artifact。
 
     --prompt-only：只输出最小 prompt（供 Agent 编排或透明调试）；
+    --result FILE：读 Agent 已产出的 JSON 回灌（不调用模型，复用同一写入路径）；
     否则用 --llm-cmd 外部命令跑完整自纠正循环（stdin 传 prompt、stdout 收 JSON）。
     """
-    from core.extract import (MAX_CHUNKS_IN_PROMPT, ExtractionInputError,
-                              LLMCallError, build_extraction_prompt,
-                              default_extraction_deps, extract, llm_fn_from_cmd)
+    from core.extract import (EXTRACTOR_ENTITY, MAX_CHUNKS_IN_PROMPT,
+                              ExtractionInputError, LLMCallError,
+                              build_extraction_prompt, default_extraction_deps,
+                              extract)
 
     if args.prompt_only:
         deps = default_extraction_deps()
@@ -454,22 +475,26 @@ def cmd_extract(args: argparse.Namespace) -> int:
             prompt, truncated = build_extraction_prompt(
                 args.extractor, chunks, source_id=doc.source_id,
                 document_id=args.document_id, model_mode=args.model_mode)
-            print(json.dumps({"document_id": args.document_id, "extractor": args.extractor,
+            print(json.dumps({"operation": "extract", "schema_version": SCHEMA_VERSION,
+                              "request": {"document_id": args.document_id,
+                                          "extractor": args.extractor,
+                                          "model_mode": args.model_mode},
+                              "expected_output": EXTRACTOR_ENTITY[args.extractor],
                               "truncated": truncated, "prompt": prompt},
                              ensure_ascii=False, indent=2))
             return EXIT_OK
         finally:
             deps.conn.close()
 
-    if not args.llm_cmd:
-        print("错误：需要 --llm-cmd '<命令>'（从 stdin 读 prompt、stdout 输出 JSON），"
-              "或 --prompt-only 只输出 prompt 由 Agent 编排", file=sys.stderr)
+    llm_fn = _llm_fn(args)
+    if llm_fn is None:
+        print(_MODE_ERR, file=sys.stderr)
         return EXIT_DEPENDENCY
 
     deps = default_extraction_deps()
     try:
         ptr = extract(extractor=args.extractor, document_id=args.document_id,
-                      llm_fn=llm_fn_from_cmd(args.llm_cmd), deps=deps,
+                      llm_fn=llm_fn, deps=deps,
                       model_mode=args.model_mode, use_cache=not args.no_cache)
     except ExtractionInputError as exc:
         print(f"错误：{exc}", file=sys.stderr)
@@ -600,9 +625,9 @@ def cmd_style_add(args: argparse.Namespace) -> int:
 
 
 def _analysis_or_mapping(args: argparse.Namespace, kind: str) -> int:
-    """analysis / mapping 共用编排（LLM 任务：--prompt-only 或 --llm-cmd）。"""
+    """analysis / mapping 共用编排（LLM 任务：--prompt-only / --llm-cmd / --result）。"""
     from core.analysis import AnalysisInputError, _case_projection, analyze
-    from core.extract import LLMCallError, default_extraction_deps, llm_fn_from_cmd
+    from core.extract import LLMCallError, default_extraction_deps
     from core.mapping import map_to_profile
 
     if kind == "mapping" and not args.profile:
@@ -636,24 +661,28 @@ def _analysis_or_mapping(args: argparse.Namespace, kind: str) -> int:
                 from core.analysis import build_analysis_prompt
                 prompt = build_analysis_prompt(
                     [_case_projection(c) for c in cases], args.model_mode)
-            _print_json({"kind": kind, "case_ids": args.case, "prompt": prompt})
+            request = {"case_ids": args.case}
+            if kind == "mapping":
+                request["profile"] = args.profile
+            _print_json({"operation": kind, "schema_version": SCHEMA_VERSION,
+                         "request": request, "expected_output": kind, "prompt": prompt})
             return EXIT_OK
         finally:
             conn.close()
 
-    if not args.llm_cmd:
-        print(f"错误：需要 --llm-cmd '<命令>'（stdin 读 prompt、stdout 输出 JSON），"
-              f"或 --prompt-only 只输出 prompt 由 Agent 编排", file=sys.stderr)
+    llm_fn = _llm_fn(args)
+    if llm_fn is None:
+        print(_MODE_ERR, file=sys.stderr)
         return EXIT_DEPENDENCY
 
     deps = default_extraction_deps()
     try:
         if kind == "mapping":
             ptr = map_to_profile(case_ids=args.case, profile_id=args.profile,
-                                 llm_fn=llm_fn_from_cmd(args.llm_cmd), deps=deps,
+                                 llm_fn=llm_fn, deps=deps,
                                  model_mode=args.model_mode, use_cache=not args.no_cache)
         else:
-            ptr = analyze(case_ids=args.case, llm_fn=llm_fn_from_cmd(args.llm_cmd),
+            ptr = analyze(case_ids=args.case, llm_fn=llm_fn,
                           deps=deps, model_mode=args.model_mode,
                           use_cache=not args.no_cache)
     except LLMCallError as exc:
@@ -782,8 +811,8 @@ def cmd_context_for_write(args):
 
 
 def cmd_write(args):
-    """LLM 写作：白名单上下文 → DraftRecord（--llm-cmd 或 --prompt-only）。"""
-    from core.extract import LLMCallError, default_extraction_deps, llm_fn_from_cmd
+    """LLM 写作：白名单上下文 → DraftRecord（--llm-cmd / --result / --prompt-only）。"""
+    from core.extract import LLMCallError, default_extraction_deps
     from core.writer import WriteInputError, write
 
     if args.prompt_only:
@@ -793,20 +822,24 @@ def cmd_write(args):
             if err:
                 print(f"错误：{err}", file=sys.stderr)
                 return EXIT_ERROR
-            _print_json({"mapping_id": args.mapping, "mode": args.mode,
+            _print_json({"operation": "write", "schema_version": SCHEMA_VERSION,
+                         "request": {"mapping_id": args.mapping, "mode": args.mode,
+                                     "topic_id": args.topic, "analysis_id": args.analysis,
+                                     "style_id": args.style},
+                         "expected_output": "draft",
                          "prompt": result["prompt"]})
             return EXIT_OK
         finally:
             conn.close()
 
-    if not args.llm_cmd:
-        print("错误：需要 --llm-cmd '<命令>'（stdin 读 prompt、stdout 输出 JSON），"
-              "或 --prompt-only 只输出 prompt 由 Agent 编排", file=sys.stderr)
+    llm_fn = _llm_fn(args)
+    if llm_fn is None:
+        print(_MODE_ERR, file=sys.stderr)
         return EXIT_DEPENDENCY
 
     deps = default_extraction_deps()
     try:
-        ptr = write(mapping_id=args.mapping, llm_fn=llm_fn_from_cmd(args.llm_cmd),
+        ptr = write(mapping_id=args.mapping, llm_fn=llm_fn,
                     deps=deps, topic_id=args.topic, analysis_id=args.analysis,
                     style_id=args.style, mode=args.mode, model_mode=args.model_mode,
                     use_cache=not args.no_cache)
@@ -829,10 +862,10 @@ def cmd_write(args):
 
 
 def cmd_audit(args):
-    """LLM 七项自查 + 标点门禁 → AuditRecord（单通道，C-07）。"""
+    """LLM 七项自查 + 标点门禁 → AuditRecord（单通道，C-07；三模式）。"""
     from core.audit import (AuditInputError, _draft_fulltext, audit,
                             build_audit_prompt)
-    from core.extract import LLMCallError, default_extraction_deps, llm_fn_from_cmd
+    from core.extract import LLMCallError, default_extraction_deps
 
     if args.prompt_only:
         conn, repo = _open_repo()
@@ -841,21 +874,24 @@ def cmd_audit(args):
             if draft is None:
                 print(f"错误：draft 不存在：{args.draft}", file=sys.stderr)
                 return EXIT_ERROR
-            _print_json({"draft_id": args.draft,
+            _print_json({"operation": "audit", "schema_version": SCHEMA_VERSION,
+                         "request": {"draft_id": args.draft,
+                                     "model_mode": args.model_mode},
+                         "expected_output": "audit",
                          "prompt": build_audit_prompt(_draft_fulltext(draft),
                                                       draft.title, args.model_mode)})
             return EXIT_OK
         finally:
             conn.close()
 
-    if not args.llm_cmd:
-        print("错误：需要 --llm-cmd '<命令>'（stdin 读 prompt、stdout 输出 JSON），"
-              "或 --prompt-only 只输出 prompt 由 Agent 编排", file=sys.stderr)
+    llm_fn = _llm_fn(args)
+    if llm_fn is None:
+        print(_MODE_ERR, file=sys.stderr)
         return EXIT_DEPENDENCY
 
     deps = default_extraction_deps()
     try:
-        ptr = audit(draft_id=args.draft, llm_fn=llm_fn_from_cmd(args.llm_cmd),
+        ptr = audit(draft_id=args.draft, llm_fn=llm_fn,
                     deps=deps, model_mode=args.model_mode, use_cache=not args.no_cache)
     except LLMCallError as exc:
         print(f"错误：LLM 调用失败（dependency_failed）：{exc}", file=sys.stderr)
@@ -1105,6 +1141,21 @@ class KbArgumentParser(argparse.ArgumentParser):
         self.exit(EXIT_USAGE, f"{self.prog}: error: {message}\n")
 
 
+def _add_llm_modes(parser) -> None:
+    """为 LLM 语义子命令统一挂载三种互斥模式（M10 Agent Adapter Contract）。
+
+    --llm-cmd  = 外部命令直跑（stdin 读 prompt、stdout 输出 JSON）
+    --prompt-only = 只输出最小 prompt（Agent 编排，不调用模型）
+    --result   = 读 Agent 已产出的 JSON 文件回灌（不调用模型，复用同一写入路径）
+    """
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--llm-cmd", help="外部 LLM 命令（stdin 读 prompt、stdout 输出 JSON）")
+    mode.add_argument("--prompt-only", action="store_true",
+                      help="只输出最小 prompt（Agent 编排，不调用模型）")
+    mode.add_argument("--result", metavar="FILE",
+                      help="回灌 Agent 已产出的 JSON 结果文件（不调用模型）")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = KbArgumentParser(prog="kb.py", description="fudaoyuan-baokuan 统一知识库 CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1209,12 +1260,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_ext.add_argument("--extractor", required=True,
                        choices=["case_facts", "style_pattern", "topic_signal"],
                        help="提取类型（pack M4 STEP 2：case/style/topic）")
-    p_ext.add_argument("--llm-cmd", help="外部 LLM 命令（从 stdin 读 prompt、stdout 输出 JSON）")
+    _add_llm_modes(p_ext)
     p_ext.add_argument("--model-mode", default="economy",
                        choices=["economy", "standard", "deep"])
     p_ext.add_argument("--no-cache", action="store_true", help="跳过 extraction_cache 短路")
-    p_ext.add_argument("--prompt-only", action="store_true",
-                       help="只输出最小 prompt（供 Agent 编排/调试，不调用 LLM）")
     p_ext.set_defaults(func=cmd_extract)
 
     # M5：search / case add / style add / analysis / mapping / profile
@@ -1244,19 +1293,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_ana = sub.add_parser("analysis", help="案例对比分析 → AnalysisRecord（LLM）")
     p_ana.add_argument("--case", action="append", required=True,
                        help="输入案例 id（可重复，≤20）")
-    p_ana.add_argument("--llm-cmd", help="外部 LLM 命令（stdin 读 prompt、stdout 输出 JSON）")
+    _add_llm_modes(p_ana)
     p_ana.add_argument("--model-mode", default="economy", choices=["economy", "standard", "deep"])
     p_ana.add_argument("--no-cache", action="store_true", help="跳过 analysis_cache 短路")
-    p_ana.add_argument("--prompt-only", action="store_true", help="只输出 prompt 由 Agent 编排")
     p_ana.set_defaults(func=lambda a: _analysis_or_mapping(a, "analysis"))
 
     p_map = sub.add_parser("mapping", help="案例 × 画像映射 → MappingRecord（LLM）")
     p_map.add_argument("--case", action="append", required=True, help="输入案例 id（可重复，≤20）")
     p_map.add_argument("--profile", help="学校画像 id（pro-school）")
-    p_map.add_argument("--llm-cmd", help="外部 LLM 命令（stdin 读 prompt、stdout 输出 JSON）")
+    _add_llm_modes(p_map)
     p_map.add_argument("--model-mode", default="economy", choices=["economy", "standard", "deep"])
     p_map.add_argument("--no-cache", action="store_true", help="跳过 mapping_cache 短路")
-    p_map.add_argument("--prompt-only", action="store_true", help="只输出 prompt 由 Agent 编排")
     p_map.set_defaults(func=lambda a: _analysis_or_mapping(a, "mapping"))
 
     p_prof = sub.add_parser("profile", help="学校画像（7 键白名单，确定性）")
@@ -1290,20 +1337,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_write.add_argument("--style", help="可选风格 id")
     p_write.add_argument("--mode", default="article",
                          choices=["article", "report", "outline", "topic_proposal"])
-    p_write.add_argument("--llm-cmd", help="外部 LLM 命令（stdin 读 prompt、stdout 输出 JSON）")
+    _add_llm_modes(p_write)
     p_write.add_argument("--model-mode", default="economy",
                          choices=["economy", "standard", "deep"])
     p_write.add_argument("--no-cache", action="store_true", help="跳过 writing_cache 短路")
-    p_write.add_argument("--prompt-only", action="store_true", help="只输出 prompt 由 Agent 编排")
     p_write.set_defaults(func=cmd_write)
 
     p_audit = sub.add_parser("audit", help="LLM 七项自查 + 标点门禁 → AuditRecord（单通道）")
     p_audit.add_argument("--draft", required=True, help="草稿 id（kb.py write 产出）")
-    p_audit.add_argument("--llm-cmd", help="外部 LLM 命令（stdin 读 prompt、stdout 输出 JSON）")
+    _add_llm_modes(p_audit)
     p_audit.add_argument("--model-mode", default="economy",
                          choices=["economy", "standard", "deep"])
     p_audit.add_argument("--no-cache", action="store_true", help="跳过 audit_cache 短路")
-    p_audit.add_argument("--prompt-only", action="store_true", help="只输出 prompt 由 Agent 编排")
     p_audit.set_defaults(func=cmd_audit)
 
     p_punct = sub.add_parser("punctuation", help="标点门禁（确定性，零 LLM）")

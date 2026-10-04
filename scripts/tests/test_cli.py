@@ -268,5 +268,29 @@ class M6CliUsageTests(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stderr)
 
 
+class M10CliTests(unittest.TestCase):
+    """M10 Agent Adapter Contract：三模式互斥与 --result 挂载（用法错误路径，不写数据）。"""
+
+    def test_llm_cmd_and_result_mutually_exclusive(self):
+        r = run(KB, "extract", "doc-test", "--extractor", "case_facts",
+                "--llm-cmd", "claude -p", "--result", "result.json")
+        self.assertEqual(r.returncode, 4, r.stderr)
+
+    def test_prompt_only_and_result_mutually_exclusive(self):
+        r = run(KB, "write", "--mapping", "map-x", "--prompt-only", "--result", "r.json")
+        self.assertEqual(r.returncode, 4, r.stderr)
+
+    def test_analysis_llm_cmd_and_result_mutually_exclusive(self):
+        r = run(KB, "analysis", "--case", "case-x", "--llm-cmd", "claude -p",
+                "--result", "r.json")
+        self.assertEqual(r.returncode, 4, r.stderr)
+
+    def test_result_flag_wired_nonexistent_document(self):
+        """--result 被 argparse 接受并进入 handler（document 缺失 → exit 1，非用法错误）。"""
+        r = run(KB, "extract", "doc-missing", "--extractor", "case_facts",
+                "--result", "result.json")
+        self.assertEqual(r.returncode, 1, r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

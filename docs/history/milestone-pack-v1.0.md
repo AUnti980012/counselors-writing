@@ -399,10 +399,10 @@ SUCCESS CRITERIA:
 Read the GLOBAL BOOTSTRAP first.
 
 Read:
-- docs/architecture-audit.md
-- docs/capability-inventory.md
-- docs/historical-feature-recovery.md
-- docs/migration-plan.md
+- docs/history/architecture-audit.md
+- docs/history/capability-inventory.md
+- docs/history/historical-feature-recovery.md
+- docs/history/migration-plan.md
 
 MISSION:
 Freeze the project's core data contract.
@@ -702,7 +702,7 @@ STEP 17 — DOCUMENT CONTRACT
 
 Create:
 
-docs/data-contract.md
+docs/architecture/data-contract.md
 
 Document:
 - entities
@@ -903,7 +903,7 @@ STEP 10 — DOCUMENTATION
 
 Create:
 
-docs/storage-architecture.md
+docs/architecture/storage-architecture.md
 
 Explain:
 - file store
@@ -1847,7 +1847,7 @@ STEP 10 — DOCUMENTATION
 
 Create:
 
-docs/data-lifecycle.md
+docs/architecture/data-lifecycle.md
 
 Include:
 - retention matrix
@@ -2016,9 +2016,9 @@ STEP 10 — TEST REPORT
 
 Create:
 
-docs/regression-report.md
-docs/compatibility-report.md
-docs/hardening-report.md
+docs/history/regression-report.md
+docs/history/compatibility-report.md
+docs/history/hardening-report.md
 
 SUCCESS CRITERIA:
 - Old useful capabilities are covered.
@@ -2585,7 +2585,7 @@ M9 = MODULE 21 + MODULE 25 + MODULE 26
 
 # 附录：与旧 22 步计划的映射（仓库内历史协议）
 
-本 pack 取代旧的 22 步实施计划（原权威方案历史文件见本机 `.claude/plans/` 目录）。映射关系见 `docs/migration-plan.md` 第 0 节：
+本 pack 取代旧的 22 步实施计划（原权威方案历史文件见本机 `.claude/plans/` 目录）。映射关系见 `docs/history/migration-plan.md` 第 0 节：
 
 | 本 pack 里程碑 | 旧 22 步 |
 |---|---|
@@ -2604,4 +2604,4 @@ pack 相对旧计划的三处规格修正（已采纳）：
 
 1. SQLite 规范路径 = `data/index.db`（旧计划为 `data/index/kb.db`）。
 2. Cache 命名空间 = `raw / processed / extraction / tasks`（旧计划第 4 层为 `temporary`）。
-3. M1 交付物增加：fixtures（正/反/最小/边界四类）、`docs/data-contract.md`、历史能力恢复矩阵。
+3. M1 交付物增加：fixtures（正/反/最小/边界四类）、`docs/architecture/data-contract.md`、历史能力恢复矩阵。

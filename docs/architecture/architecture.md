@@ -1,6 +1,6 @@
 # Architecture（V2 目标架构）
 
-> 对应 pack M9 STEP 1-2（端到端集成 + 指针优先交接）。V1 审计基线见 `docs/architecture-audit.md`。
+> 对应 pack M9 STEP 1-2（端到端集成 + 指针优先交接）。V1 审计基线见 `docs/history/architecture-audit.md`。
 
 ## 1. 目标流水线
 

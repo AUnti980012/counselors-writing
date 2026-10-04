@@ -2,7 +2,7 @@
 
 文章输出前**必须**过这道门。七项全查，逐条勾，任何一项「风险/不通过」都要提示修改，不能放行。目标是「既有流量意识，更有育人尺度」。
 
-> M6 起（C-07）：思政第二意见已删除，质检收敛为**单通道**——七项结构化自查 + 标点门禁，无全文外传、无 qwen-verify 依赖。本文件是七项清单的**唯一规则源**；审核已命令化为 `kb.py audit`（机器可读 AuditRecord）。
+> M6 起（C-07）：思政第二意见已删除，质检收敛为**单通道**——七项结构化自查 + 标点门禁，无全文外传、无第二模型依赖。本文件是七项清单的**唯一规则源**；审核已命令化为 `kb.py audit`（机器可读 AuditRecord）。
 
 ## 一、七项可勾选 checklist
 
@@ -56,11 +56,12 @@
 
 ```bash
 # 单通道审核：七项结构化自查（LLM）+ 标点门禁（确定性，零 LLM）
-python scripts/kb.py audit --draft <draft_id> --llm-cmd "claude -p"
-# 无 LLM CLI 时：--prompt-only 输出审核 prompt 由 Agent 编排
+python scripts/kb.py audit --draft <draft_id> --llm-cmd "<LLM_COMMAND>"
+# 无 LLM CLI 时：--prompt-only 输出审核 prompt 由 Agent 编排，再 --result 回灌
 python scripts/kb.py audit --draft <draft_id> --prompt-only
+python scripts/kb.py audit --draft <draft_id> --result 审核结果.json
 
-# 标点门禁可独立跑（exit 0 通过 / 1 有 findings / 2 ko 暂不支持）
+# 标点门禁可独立跑（exit 0 通过 / 2 有 findings 或 ko 暂不支持）
 python scripts/kb.py punctuation <正文文件>
 ```
 

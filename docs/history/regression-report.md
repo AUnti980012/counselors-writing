@@ -2,7 +2,7 @@
 
 > 对应 pack M8 STEP 6-8（历史能力回归矩阵 + legacy 薄封装检查 + 退役记录）。
 > 结论：**15 项历史能力全覆盖，零静默回退**；9 处有意行为变更（C-01~C-09）全部记录在
-> `docs/migration-plan.md` 第 2 节；legacy 脚本转薄封装（pack STEP 7），重复业务逻辑已消除。
+> `docs/history/migration-plan.md` 第 2 节；legacy 脚本转薄封装（pack STEP 7），重复业务逻辑已消除。
 
 ## 1. 回归矩阵（15 项）
 

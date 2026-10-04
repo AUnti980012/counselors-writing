@@ -1,6 +1,35 @@
 # Changelog
 
-本仓库按 `docs/milestone-pack-v1.0.md` 的 M0→M9 协议演进。里程碑细节见 `docs/migration-plan.md`。
+本仓库按 `docs/history/milestone-pack-v1.0.md` 的 M0→M9 协议演进。里程碑细节见 `docs/history/migration-plan.md`。
+
+## [2.1.0] - 2026-10-04
+
+M10 产品化收口：把「工程重构完成」收口为「可长期交付给不同 Agent 与真实用户的产品」。
+
+### 版本号（四种语义分离）
+
+| 版本 | 值 | 含义 |
+|---|---|---|
+| Skill | **2.1.0** | 用户可见能力/行为契约（新增 `--result` 回灌闭环） |
+| KB | **0.10.0** | CLI/核心接口（`--result` 新接口） |
+| Schema | 1.0.0（不变） | 数据契约（无字段变化） |
+| DB | 3（不变） | SQLite migration（无迁移） |
+
+### 变更
+
+- **Agent Adapter Contract（P0-A）**：`extract` / `analysis` / `mapping` / `write` / `audit` 五命令统一三模式（互斥）——`--llm-cmd "<LLM_COMMAND>"` / `--prompt-only` / `--result <file>`。`--result` 用 `llm_fn_from_file` 复用既有 parse→inject→validate→persist 路径，零复制写入逻辑、无 shell 风险。`--prompt-only` 输出统一为 `{operation, schema_version, request, expected_output, prompt}` 机器可读 JSON。
+- **选题语义闭环（P0-B）**：明确 `AnalysisRecord`（`analysis --case`）与 `TopicRecord`（`extract --extractor topic_signal`）边界；`search topic` 仅检索。`references/topic-selection.md` 已对齐。
+- **文档分层（P0-C）**：`docs/` 分 `user/` `integration/` `architecture/` `history/` 四层，所有内部链接已修复。
+- **SKILL.md 瘦身（P0-D）**：改为 8 段 Runtime 结构，更短且能力不缩水；移除平台专属命令示例。
+- **AGENTS.md 改开发入口（P0-E）**：不再要求读历史里程碑全文；保留单一真相源、安全规则、测试门禁、版本一致性。
+- **README 改用户入口（P0-F）**：增加「5 分钟第一次使用」与多 Agent 使用说明，移除固定测试数字。
+- **LICENSE 落地（P0-G）**：MIT，与 frontmatter 声明一致。
+- **Python 版本修正**：代码实际使用 `X | None` 联合类型（3.10+），`bootstrap.py` 与文档统一为 **Python 3.10+**（原 3.9+ 为漂移）。
+- **文档一致性**：Runtime 文档清除 `claude -p` / `qwen-verify` / `WebSearch` 平台专属引用；修正标点门禁退出码漂移（findings/ko 均为 exit 2）。
+
+### 测试
+
+全量测试必须通过：`python scripts/kb.py test`（当前基线 **457**；新增 `--result` 回灌 / 互斥 / 非法拒绝等 10 条）。`python scripts/kb.py schemas export --check` 零漂移。
 
 ## [2.0.0] - 2026-10-04
 

@@ -22,7 +22,7 @@
 
 ## 三、案例库 schema（data/case_library/cases.jsonl，每条一行 JSON）
 
-> **V2 数据边界（M1 已冻结契约，M2 导入时按此拆分）**：下面这条 16 字段 JSON 是 V1 遗留格式，混装了四类职责。V2 拆为多个实体（逐字段映射见 `docs/data-contract.md` §8）：
+> **V2 数据边界（M1 已冻结契约，M2 导入时按此拆分）**：下面这条 16 字段 JSON 是 V1 遗留格式，混装了四类职责。V2 拆为多个实体（逐字段映射见 `docs/architecture/data-contract.md` §8）：
 > - **案例知识**（id/source_material/tags 等）→ `data/schemas/case.schema.json`（CaseRecord；红线：不含 effect/retro/review_*；angles 评价走 topic 契约）
 > - **正文产出** → `data/schemas/draft.schema.json`（title_used→title；style→style_id 引用）+ `topic.schema.json`（hook/value_landing/titles）+ `style.schema.json`（structure）
 > - **审核结论**（review_result/review_issues）→ `data/schemas/audit.schema.json`
@@ -60,10 +60,12 @@
 
 ```bash
 # M4 起：从素材/复盘结论结构化提取知识（LLM 提取 → 校验 → 自纠正 ≤2 → knowledge/artifact）
-python3 scripts/kb.py extract <document_id> --extractor case_facts --llm-cmd "claude -p"
-python3 scripts/kb.py extract <document_id> --extractor style_pattern --llm-cmd "claude -p"
-python3 scripts/kb.py extract <document_id> --extractor topic_signal --llm-cmd "claude -p"
-# 无 LLM CLI 时：--prompt-only 输出最小 prompt 由 Agent 编排，再 --result 回灌（M5 落地写入命令后）
+python3 scripts/kb.py extract <document_id> --extractor case_facts --llm-cmd "<LLM_COMMAND>"
+python3 scripts/kb.py extract <document_id> --extractor style_pattern --llm-cmd "<LLM_COMMAND>"
+python3 scripts/kb.py extract <document_id> --extractor topic_signal --llm-cmd "<LLM_COMMAND>"
+# 无 LLM CLI 时：--prompt-only 输出最小 prompt 由 Agent 编排，再 --result 回灌
+python3 scripts/kb.py extract <document_id> --extractor case_facts --prompt-only
+python3 scripts/kb.py extract <document_id> --extractor case_facts --result 案例.json
 
 # M5 起：case/style 写入与检索由 kb.py 接管（legacy case_lib.py/style_lib.py 转薄封装）
 python scripts/kb.py case add < 案例.json                    # stdin 读案例 JSON（V1 3 键或完整 CaseRecord）

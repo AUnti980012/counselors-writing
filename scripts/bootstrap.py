@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """bootstrap.py — 环境探测（跨 Agent 第一入口）。
 
-检查 Python ≥3.9 与 pydantic ≥2；缺失时明确报错 + 安装指引（不静默降级）。
+检查 Python ≥3.10 与 pydantic ≥2；缺失时明确报错 + 安装指引（不静默降级）。
 退出码：0 就绪 / 3 依赖缺失。
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from core.paths import ROOT
 
 reconfigure_utf8()
 
-MIN_PY = (3, 9)
+MIN_PY = (3, 10)  # 代码实际使用 X | None 联合类型与内建泛型 list[...]，需 3.10+
 MIN_PYDANTIC = "2.0"
 
 
@@ -27,7 +27,7 @@ def main() -> int:
     }
     problems: list = []
     if sys.version_info < MIN_PY:
-        problems.append(f"Python 版本过低（{sys.version.split()[0]} < 3.9）")
+        problems.append(f"Python 版本过低（{sys.version.split()[0]} < 3.10）")
     try:
         import pydantic
         report["pydantic"] = pydantic.VERSION

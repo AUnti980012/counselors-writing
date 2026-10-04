@@ -524,6 +524,32 @@ def llm_fn_from_cmd(cmd: str) -> Callable[[str], str]:
     return llm_fn
 
 
+def llm_fn_from_file(path: str) -> Callable[[str], str]:
+    """从文件读取 Agent 已产出的 JSON 结果（--result 回灌，M10 Agent Adapter Contract）。
+
+    与 llm_fn_from_cmd 同一契约（Callable[[str], str]）：返回的 callable 忽略
+    prompt（Agent 已在外部用 --prompt-only 拿到 prompt 并调用自身模型），只把文件
+    里的 JSON 原样交回既有 parse → inject → validate → persist 流程，不复制任何
+    新的写入路径。文件不可读/为空抛 LLMCallError（LLM 依赖失败语义，CLI exit 3，
+    源数据不损坏）。
+    """
+    path = (path or "").strip()
+    if not path:
+        raise ValueError("结果文件路径不能为空")
+
+    def llm_fn(prompt: str) -> str:
+        try:
+            with open(path, encoding="utf-8") as f:
+                content = f.read()
+        except OSError as exc:
+            raise LLMCallError(f"结果文件无法读取：{exc.strerror or exc}") from None
+        if not content.strip():
+            raise LLMCallError(f"结果文件为空：{path}")
+        return content
+
+    return llm_fn
+
+
 # ---- 主入口 ----
 
 def extract(*, extractor: str, llm_fn: Callable[[str], str],
