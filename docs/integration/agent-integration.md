@@ -30,8 +30,9 @@ LLM 语义命令共 5 个，统一支持三种**互斥**模式：
 | `extract <doc> --extractor case_facts\|style_pattern\|topic_signal` | 从素材结构化提取 | case / style / topic |
 | `analysis --case <id> [--case <id2>]` | 案例对比分析 | analysis |
 | `mapping --case <id> --profile <id>` | 案例 × 画像映射 | mapping |
-| `write --mapping <id> [--topic/--analysis/--style]` | 白名单上下文写作 | draft |
-| `audit --draft <id>` | 单通道七项自查 | audit |
+| `write --mapping <id> [--topic/--analysis/--style]` | 案例写作（白名单上下文） | draft |
+| `write --topic <id> [--mode ...] [--style/--profile/--sources]` | 通用写作（无 case/mapping） | draft |
+| `audit --draft <id>` | 单通道七项自查（按 draft.mode 措辞） | audit |
 
 三种模式（互斥，`argparse` 强制）：
 
@@ -43,6 +44,21 @@ LLM 语义命令共 5 个，统一支持三种**互斥**模式：
 
 三者都**不重复读取 raw/全文/整库**；`--result` 复用与 `--llm-cmd` 完全相同的 parse → inject → validate → persist 路径，不复制任何写入逻辑。
 
+### 2.1 Agent Routing：Case-based vs Generic
+
+Agent 判断该走哪条写作路径：
+
+| 输入 | 路径 |
+|---|---|
+| 含真实学生案例（谈心/班会/学生事件） | **Case-based**：`extract case_facts` → `analysis`（按需）→ `mapping` → `write --mapping` |
+| 无学生案例，但明确要政策/热点/指南/公共主题/通用文章 | **Generic**：`extract topic_signal`（Content Brief）→ `write --topic` |
+| 不确定 | 先做最小 Topic/Brief 分析，**不要直接跑完整 Pipeline** |
+
+- Generic 写作**不需要 Case/Mapping**，结果直接落 DraftRecord（lineage 记录 `topic_id + source_ids`）。
+- **严禁伪 Case**：不得为了走流程把 Generic 内容捏造成学生案例 → Mapping。
+- `analysis` 仅用于案例路径；`write --topic` 不接受 `--analysis`。
+- 只有用户明确说「结合本校特点/画像」时，Generic 才投影 `--profile`。
+
 ## 3. `--prompt-only` 输出结构
 
 统一为机器可读 JSON：
@@ -50,8 +66,9 @@ LLM 语义命令共 5 个，统一支持三种**互斥**模式：
 ```json
 {
   "operation": "analysis",
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "request": { "case_ids": ["case-..."] },
+  "input_digest": "…request 绑定摘要…",
   "expected_output": "analysis",
   "prompt": "…最小 prompt…"
 }
@@ -59,16 +76,32 @@ LLM 语义命令共 5 个，统一支持三种**互斥**模式：
 
 - `operation` / `expected_output`：告诉 Agent 这一步产出什么实体。
 - `request`：最小输入元数据（id 列表，**不含正文**）。
+- `input_digest`：request 绑定摘要（`operation + 请求输入 id` 的哈希），用于 `--result` 回灌时的误提交保护。
 - `prompt`：Agent 唯一需要交给模型的文本。
 - Agent 不需要解析人类说明文字就能拿到 prompt。
 
 ## 4. `--result` 回灌
 
-Agent 在外部调用模型拿到 JSON 后，把 JSON 原样写入文件（**就是实体 JSON，不是包装对象**），再回灌：
+Agent 在外部调用模型拿到 JSON 后，把 JSON 写入文件，再回灌：
 
 ```bash
 python scripts/kb.py analysis --case case-abc --result /tmp/analysis_result.json
 ```
+
+结果文件支持两种形式：
+
+1. **原始实体 JSON**（向后兼容）：直接把模型产出的实体 JSON 写入文件。
+2. **绑定 wrapper**（推荐，防误回灌）：把 `--prompt-only` 输出里的 `operation` / `input_digest` 原样回填，包住实体 JSON：
+
+```json
+{
+  "operation": "analysis",
+  "input_digest": "<来自 --prompt-only 的 input_digest>",
+  "result": { "topic": "…", "patterns": […] }
+}
+```
+
+使用 wrapper 时，`--result` 会校验 `operation` 与 `input_digest` 是否与当前命令一致（不一致 → exit 2，拒绝写入，源数据不损坏），再解包出 `result` 走后续流程。原始实体 JSON 不做绑定校验（绑定是可选增强）。
 
 Python 读取文件 → parse → 确定性字段注入（剥离 LLM 越权的 id/状态，补 id+来源+证据）→ PII 脱敏 → Pydantic 校验 → 落 knowledge/artifact/索引/缓存。返回结构与 `--llm-cmd` 完全一致。
 
@@ -108,6 +141,7 @@ python scripts/kb.py extract doc-xyz --extractor case_facts --result case.json
 |---|---|
 | LLM 失败（--llm-cmd 超时/非零退出/命令不存在） | exit 3（dependency_failed），**源数据不损坏**（canonical 只在校验通过后才写） |
 | `--result` 文件不存在/为空 | exit 3，不写任何数据 |
+| `--result` 绑定不匹配（operation/input_digest） | exit 2，拒绝写入（误回灌保护，源数据不损坏） |
 | JSON 无效 | Python 拒绝（parse 失败），不落 knowledge |
 | 校验失败 | 进入既有 self-correction（≤2）→ 仍失败则落 `failed` artifact + 保留 raw，可修复后重跑 |
 | 中断 | 用 `kb.py task create/resume` 断点续跑（16 态状态机 + context_refs） |

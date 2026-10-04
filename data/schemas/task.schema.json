@@ -131,7 +131,7 @@
   "description": "16 态任务状态机契约。任务状态由确定性引擎管理，LLM 不持有任务状态。\n\n状态迁移表在 M7（core/task.py）实现；本契约只约束枚举与可恢复性字段。",
   "properties": {
     "schema_version": {
-      "default": "1.0.0",
+      "default": "1.1.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

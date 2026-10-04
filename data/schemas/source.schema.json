@@ -3,7 +3,7 @@
   "description": "来源元数据契约。红线：不承载完整网页正文（raw 落 cache/raw，见 data-contract）。",
   "properties": {
     "schema_version": {
-      "default": "1.0.0",
+      "default": "1.1.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

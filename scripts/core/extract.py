@@ -171,7 +171,7 @@ _MANAGED_FIELDS = {
     # M6：draft/audit 的托管字段（写作/审核由 Python 注入 id/血缘/分组/verdict，
     # 否则 schema_summary 会把它们列进「必填」清单与同 prompt 的禁令矛盾）
     "draft": {"draft_id", "task_id", "schema_version", "created_at", "updated_at",
-              "word_count", "style_id", "lineage", "status"},
+              "word_count", "style_id", "lineage", "status", "mode"},
     "audit": {"audit_id", "draft_id", "schema_version", "created_at", "updated_at",
               "passed", "fact_check", "style_check", "format_check", "risk_check"},
 }
@@ -184,23 +184,72 @@ def schema_summary(entity: str) -> str:
     props = schema.get("properties", {})
     required = set(schema.get("required", []))
     managed = _MANAGED_FIELDS.get(entity, set())
+    defs = schema.get("$defs", {})
     lines: List[str] = []
     for name, spec in props.items():
         if name in managed:
             continue
-        t = _json_type(spec)
+        t = _json_type(spec, defs)
         desc = (spec.get("description") or "").split("；")[0].split("（")[0][:40]
         req = "必填" if name in required else "可选"
         lines.append(f"- {name}（{req}，{t}）：{desc}".rstrip("："))
     return "\n".join(lines)
 
 
-def _json_type(spec: Dict[str, Any]) -> str:
+def _json_type(spec: Dict[str, Any], defs: Dict[str, Any] = None,
+               depth: int = 0) -> str:
+    """类型摘要：array 的 item 若为 $ref/object 则展开一层（仅 required 字段）。
+
+    P2-1 修复：旧实现把 array<$ref> 显示成 array<?>，LLM 拿不到嵌套字段形状。
+    现在最多展开「顶层字段 → array item → item object 的一层字段」，既提高
+    LLM 一次通过率，又不把整个 JSON Schema 复制给模型（防 Token 黑洞）。
+    """
+    defs = defs or {}
+    if depth > 2:
+        return "object"
+    t = spec.get("type")
+    if t == "array":
+        return "array<" + _item_type(spec.get("items", {}), defs, depth) + ">"
+    if t == "object":
+        return _object_shape(spec, defs, depth)
+    if t:
+        return t
+    if "$ref" in spec:
+        return _json_type(defs.get(spec["$ref"].split("/")[-1], {}), defs, depth)
+    return "object"
+
+
+def _item_type(items: Dict[str, Any], defs: Dict[str, Any], depth: int) -> str:
+    """array item 类型：object/$ref 展开一层；标量给类型名。"""
+    t = items.get("type")
+    if t == "object":
+        return _object_shape(items, defs, depth + 1)
+    if t:
+        return t
+    if "$ref" in items:
+        return _json_type(defs.get(items["$ref"].split("/")[-1], {}), defs, depth + 1)
+    return "?"
+
+
+def _object_shape(spec: Dict[str, Any], defs: Dict[str, Any], depth: int) -> str:
+    """object 形状：仅 required 字段（无 required 取前 4 个），字段只给标量/浅层 array。"""
+    if depth > 2:
+        return "object"
+    props = spec.get("properties", {})
+    if not props:
+        return "object"
+    required = spec.get("required", [])
+    chosen = [n for n in required if n in props] or list(props)[:4]
+    parts = [f"{n}: {_scalar(props[n], defs)}" for n in chosen]
+    return "{" + ", ".join(parts) + "}"
+
+
+def _scalar(spec: Dict[str, Any], defs: Dict[str, Any]) -> str:
+    """字段级标量类型：不再展开 object 内容，只给类型名或浅层 array<X>。"""
     t = spec.get("type")
     if t == "array":
         items = spec.get("items", {})
-        inner = items.get("type") or (
-            items.get("anyOf", [{}])[0].get("$ref", "").split("/")[-1] or "?")
+        inner = items.get("type") or (items.get("$ref", "").split("/")[-1] or "?")
         return f"array<{inner}>"
     if t:
         return t
@@ -524,14 +573,31 @@ def llm_fn_from_cmd(cmd: str) -> Callable[[str], str]:
     return llm_fn
 
 
-def llm_fn_from_file(path: str) -> Callable[[str], str]:
+class ResultBindingError(ValueError):
+    """--result 回灌的 JSON 与当前请求绑定不一致（operation / input_digest 不匹配）。
+
+    M10.1 误回灌保护：防止「任务 A 生成的 JSON 误提交到任务 B」静默错存。
+    CLI 据此映射 exit 2（校验未通过），源数据不损坏。
+    """
+
+
+def llm_fn_from_file(path: str, *, expected_operation: str = None,
+                     expected_input_digest: str = None) -> Callable[[str], str]:
     """从文件读取 Agent 已产出的 JSON 结果（--result 回灌，M10 Agent Adapter Contract）。
 
     与 llm_fn_from_cmd 同一契约（Callable[[str], str]）：返回的 callable 忽略
     prompt（Agent 已在外部用 --prompt-only 拿到 prompt 并调用自身模型），只把文件
     里的 JSON 原样交回既有 parse → inject → validate → persist 流程，不复制任何
-    新的写入路径。文件不可读/为空抛 LLMCallError（LLM 依赖失败语义，CLI exit 3，
-    源数据不损坏）。
+    新的写入路径。
+
+    误回灌保护（M10.1）：文件可为「原始实体 JSON」（向后兼容）或可选绑定 wrapper：
+
+        {"operation": "<op>", "input_digest": "<request-digest>", "result": {…实体 JSON…}}
+
+    传入 expected_operation / expected_input_digest 时，若文件是 wrapper 则校验
+    绑定（不匹配抛 ResultBindingError），并解包出 result；若是原始实体 JSON 则
+    原样通过（绑定为可选增强，不强制）。文件不可读/为空抛 LLMCallError（LLM
+    依赖失败语义，CLI exit 3，源数据不损坏）。
     """
     path = (path or "").strip()
     if not path:
@@ -545,6 +611,20 @@ def llm_fn_from_file(path: str) -> Callable[[str], str]:
             raise LLMCallError(f"结果文件无法读取：{exc.strerror or exc}") from None
         if not content.strip():
             raise LLMCallError(f"结果文件为空：{path}")
+        if expected_operation is not None or expected_input_digest is not None:
+            try:
+                obj = json.loads(content)
+            except (json.JSONDecodeError, ValueError):
+                obj = None
+            if isinstance(obj, dict) and "result" in obj and "operation" in obj:
+                if expected_operation is not None and obj.get("operation") != expected_operation:
+                    raise ResultBindingError(
+                        f"结果文件 operation={obj.get('operation')!r} 与当前命令 "
+                        f"{expected_operation!r} 不匹配（可能误提交了另一个命令的 JSON）")
+                if expected_input_digest is not None and obj.get("input_digest") != expected_input_digest:
+                    raise ResultBindingError(
+                        "结果文件 input_digest 与当前请求不匹配（可能误提交了另一个任务的 JSON）")
+                return json.dumps(obj["result"], ensure_ascii=False)
         return content
 
     return llm_fn

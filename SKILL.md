@@ -6,7 +6,7 @@ compatibility: "需要 Python 3.10+ + pydantic>=2（可选 readability-lxml + ht
 metadata:
   audience: 高校辅导员
   display_name: "Counselors-Writing"
-  version: "2.1.0"
+  version: "2.2.0"
 ---
 
 # Counselors-Writing（辅导员爆款文章）
@@ -30,14 +30,25 @@ metadata:
 
 判断不了就问用户：选题、抓热点、写正文、质检、还是复盘？
 
-## 3. Runtime Workflow（从素材到推文）
+## 3. Runtime Workflow（两条写作入口）
+
+### Case-based（案例驱动）
 
 1. **收集素材**：信息不足先问；用户提供内容 `kb.py ingest [--file f] [--url u]`。
 2. **案例知识**：`kb.py extract <doc> --extractor case_facts`。
-3. **选题**：`kb.py extract <doc> --extractor topic_signal` 产出 TopicRecord；`kb.py search topic <kw>` 检索已有选题。`analysis --case <id>` 产出 AnalysisRecord（学生关心什么/核心冲突/角度），与选题是**两个实体**，不混用。
-4. **映射**：`kb.py mapping --case <id> --profile pro-school`。
+3. **选题（可选）**：`kb.py extract <doc> --extractor topic_signal` 产出 TopicRecord；`kb.py search topic <kw>` 检索已有选题。`analysis --case <id>` 产出 AnalysisRecord（学生关心什么/核心冲突/角度），与选题是**两个实体**，不混用。
+4. **映射**：`kb.py mapping --case <id> --profile pro-school`（案例写作的本地化入口，必需）。
 5. **写作**：`kb.py write --mapping <id> [--topic/--analysis/--style]`。
-6. **过门**：`kb.py punctuation --lang zh <正文>`（零 LLM）+ `kb.py audit --draft <id>`（七项自查）。
+
+### Generic（通用内容：政策 / 热点 / 指南 / 校园公共议题）
+
+1. **素材**：`kb.py fetch <url>` 或 `kb.py ingest` 得来源；`kb.py extract <doc> --extractor topic_signal` 得 TopicRecord（复用为 Content Brief）。
+2. **写作**：`kb.py write --topic <id> [--mode guide|article|commentary|report|outline] [--style <id>] [--profile <id>] [--sources <src,...>]`——**不需要 mapping、不需要 Case**。
+3. **严禁伪 Case**：不得为了走流程把 Generic 内容捏造成学生案例 → Mapping（数据语义边界）。
+
+### 两条路径共同收口
+
+6. **过门**：`kb.py punctuation --lang zh <正文>`（零 LLM）+ `kb.py audit --draft <id>`（七项自查，按 draft.mode 措辞）。
 7. **交付**：`kb.py output render --draft <id>`。
 8. **复盘沉淀**：`kb.py case add` / `kb.py style add`（不阻塞交付）。
 
@@ -45,15 +56,16 @@ metadata:
 
 - **学生隐私硬门槛**：命中即脱敏改写（改名/去学号/模糊事件组合）；无法脱敏则提示「不建议公开」。
 - **事实/推断强制分离**：documented_fact/source_claim 必带 evidence_ids；ai_inference/derived_pattern/recommendation 必带 basis；拿不准标「待核实」。
-- **禁止整库/整文进 LLM 上下文**：两级检索（L1 紧凑投影 / L2 显式 `--get`）+ 指针优先，正文/raw 只落盘不回流。
+- **Mapping 仅案例写作需要**：Generic 写作不需要 Case/Mapping；除非用户明确要求「结合本校画像」才投影 profile。严禁把 Generic 内容捏造成学生案例。
+- **禁止默认把整库/raw HTML/无关历史材料/重复上下文回流进 LLM**：两级检索（L1 紧凑投影 / L2 显式 `--get`）+ 指针优先，正文/raw 只落盘不回流。**唯一例外**：审核当前 Draft 时，允许把「当前待审核正文」作为必要全文输入，且受明确字符上限约束（audit `MAX_PROMPT_CHARS`=8000），不夹带整库/历史/无关来源。
 - **禁止绕过登录/验证码/IP 限制/付费墙/Bot 检测**：403/429 → 有限重试 → 官方替代源 → 用户提供内容。
-- **每交付一次正文，都尝试沉淀一条经验**（不阻塞交付）。
+- **复盘沉淀是条件触发，不是每次交付的必经步骤**：只有存在新的传播数据 / 用户反馈 / 有效写法 / 失败原因等增量时才沉淀；无增量直接结束，不额外调用 LLM、不强制写回知识库。
 
 ## 5. Token / Context Rules
 
 - 默认只读必要信息；L1 检索有界（style 硬上限 10），L2 必须显式 `--get`。
 - 阶段间只传 `id / path / hash / status / schema_version / 摘要`，不传全文。
-- 不把 raw HTML、全文、整库、重复 prompt 回灌；不为「解释完整」在 stdout 打印大段正文。
+- 不把 raw HTML、整库、重复 prompt、无关长文本回灌（审核所需 Draft 全文除外，且有界）；不为「解释完整」在 stdout 打印大段正文。
 
 ## 6. Agent Adapter Contract
 

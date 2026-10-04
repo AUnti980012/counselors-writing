@@ -453,6 +453,15 @@ class Repository:
             "WHERE text LIKE ? LIMIT ?", (f"%{kw}%", top)).fetchall()
         return [dict(r) for r in rows]
 
+    def source_chunks(self, source_id: str, limit: int = 8) -> List[Dict[str, Any]]:
+        """来源 → 有界分块片段（按 document 顺序、sequence 排序）。供 Generic Writing
+        投影使用：绝不整段回流 raw/全文，只取 chunk 内联文本（≤2000 字符/块）。"""
+        rows = self.conn.execute(
+            "SELECT chunk_id, document_id, heading, text FROM chunks "
+            "WHERE source_id=? ORDER BY document_id, sequence LIMIT ?",
+            (source_id, max(1, limit))).fetchall()
+        return [dict(r) for r in rows]
+
     def _scan_canonical(self, entity: str, kw: str, top: int,
                         match_fn) -> List[Dict[str, Any]]:
         """unicode61 回退：Python 子串扫描 canonical 文件（数据量小，确定性优先）。

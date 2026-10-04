@@ -127,7 +127,7 @@
   "description": "选题卡契约（对齐五角度框架与选题卡模板，修复 V1 字段 drift）。",
   "properties": {
     "schema_version": {
-      "default": "1.0.0",
+      "default": "1.1.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

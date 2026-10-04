@@ -6,7 +6,10 @@
 
 - M0→M9 已完成（2026-10-04），仓库已收敛为可迭代的 Agent Knowledge Pipeline。
 - M10 产品化收口（Agent Adapter Contract：`--result` 回灌 + docs 分层）已落地。
-- 版本：Skill `2.1.0` / KB `0.10.0` / Schema `1.0.0` / DB `3`。
+- M10.1 最终运行时加固已落地：`--result` 误回灌保护（绑定 wrapper）、SQLite 连接生命周期修复、Audit 全文规则澄清、Retro 增量触发。
+- M10.2 通用内容写作已落地：`write --topic`（无 mapping 的 Generic 路径）+ schema_summary 嵌套 $ref 展开 + audit mode 措辞。能力模型 = Case-based（Case→optional Analysis→Mapping→Writing）+ Generic（Topic→Sources→Writing），共同收口 Punctuation→Audit→Output。
+- 版本：Skill `2.3.0` / KB `0.12.0` / Schema `1.1.0` / DB `3`。
+- **下一阶段：正式进入真实灰度，不再做大规模架构施工。**
 
 ## 2. 单一真相源
 
@@ -38,12 +41,13 @@ python scripts/kb.py schemas export --check                  # 契约零漂移�
 - 文档写了 `--result`，代码就必须支持；代码支持了，契约说明就必须写。禁止「文档有代码无」或「代码有契约无」的漂移。
 - Runtime 文档（SKILL/README/references/integration）禁止出现平台专属命令（如外部 LLM 命令名、MCP 工具名、第二模型名）与用户专属绝对路径。
 
-## 6. 本轮（M10）开发任务范围
+## 6. 本轮（M10.1）开发任务范围
 
-1. `--result <file>` 回灌（已完成，复用 `llm_fn_from_file`）。
-2. docs 分 `user/` `integration/` `architecture/` `history/` 四层（已完成）。
-3. SKILL/AGENTS/README 三文件职责分离（本文件）。
-4. LICENSE 落地 + CHANGELOG 更新。
+1. `--result` 误回灌保护：`input_digest` 绑定 + `ResultBindingError`（已完成）。
+2. SQLite 连接生命周期：`cmd_fetch`/`cmd_ingest`/`cmd_artifact_create`/`cmd_artifact_status` 补 close（已完成）。
+3. result round-trip 黄金路径测试 + write 三参数语义测试（已完成）。
+4. Audit 全文规则澄清 + Retro 增量触发 + 文档去平台耦合（已完成）。
+5. 灰度测试操作说明（见 `docs/user/` 与交付报告）。
 
 ## 7. 历史文档路径说明
 

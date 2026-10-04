@@ -558,5 +558,50 @@ class AgentAdapterResultTests(unittest.TestCase):
             "case", entity_id_for("case", self.digest)))
 
 
+class SchemaSummaryTests(unittest.TestCase):
+    """P2-1 修复：schema_summary 对嵌套 $ref 展开一层（array<{required fields}>）。"""
+
+    def test_topic_nested_refs_expanded(self):
+        from core.extract import schema_summary
+        s = schema_summary("topic")
+        self.assertIn("array<{name: string, score: number}>", s, "angles 应展开必填字段")
+        self.assertIn("array<{type: string, text: string}>", s, "titles 应展开必填字段")
+
+    def test_mapping_nested_refs_expanded(self):
+        from core.extract import schema_summary
+        s = schema_summary("mapping")
+        self.assertIn("array<{point: string}>", s)
+        self.assertIn("array<{difference: string}>", s)
+        self.assertIn("array<{risk: string}>", s)
+
+    def test_draft_and_audit_nested_refs(self):
+        from core.extract import schema_summary
+        self.assertIn("array<{content: string}>", schema_summary("draft"))
+        self.assertIn("array<{check: string, verdict: string}>", schema_summary("audit"))
+
+    def test_primitive_and_scalar_types(self):
+        from core.extract import _json_type
+        self.assertEqual(_json_type({"type": "string"}), "string")
+        self.assertEqual(_json_type({"type": "number"}), "number")
+        self.assertEqual(_json_type({"type": "array", "items": {"type": "string"}}),
+                         "array<string>")
+        self.assertEqual(_json_type({"type": "array", "items": {"type": "integer"}}),
+                         "array<integer>")
+
+    def test_array_of_ref_object(self):
+        from core.extract import _json_type
+        defs = {"Obj": {"type": "object", "properties": {"a": {"type": "string"},
+                                                          "b": {"type": "number"}},
+                        "required": ["a"]}}
+        self.assertEqual(_json_type({"type": "array", "items": {"$ref": "#/$defs/Obj"}}, defs),
+                         "array<{a: string}>")
+
+    def test_array_of_inline_object(self):
+        from core.extract import _json_type
+        spec = {"type": "array", "items": {"type": "object",
+                "properties": {"x": {"type": "string"}}, "required": ["x"]}}
+        self.assertEqual(_json_type(spec), "array<{x: string}>")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -75,6 +75,6 @@ python scripts/kb.py search case --get case-xxx --fields methods,transferable_pa
 
 ## 五、回写纪律
 
-- 复盘后**必须**尝试把一条经验写回案例库和风格库（M4 起用 `kb.py extract` 从复盘素材结构化提取；M5 起 `kb.py case/style` 写入命令接管）；写回不阻塞交付，但不要跳过。
+- 复盘是**条件触发的增量知识沉淀阶段，不是每次交付的必经步骤**：只有存在新的传播数据 / 用户明确反馈 / 新的有效写法 / 新的失败原因 / 明确发现的改进模式时，才把经验写回案例库和风格库（M4 起用 `kb.py extract` 从复盘素材结构化提取；M5 起 `kb.py case/style` 写入命令接管）。**没有增量就直接结束，不额外调用 LLM、不强制写回。**
 - 案例库里的 `source_material` 必须已脱敏（不含姓名 / 学号 / 独特可定位事件组合）。
 - 只沉淀「可复用」的经验，不沉淀一次性巧合。

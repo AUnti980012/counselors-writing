@@ -36,6 +36,22 @@ python scripts/kb.py output render --draft <draft_id>
 
 > 没有外部 LLM 命令时，用 `--prompt-only` 拿 prompt → 你的 Agent 生成 JSON → `--result <file>` 回灌，三步等价。详见下文「在不同 Agent 里使用」。
 
+### 通用内容写作（政策 / 热点 / 指南，无学生案例）
+
+```bash
+# 1) 素材（抓取或粘贴）
+python scripts/kb.py ingest --file 政策资料.txt
+# 2) 内容简报（复用 TopicRecord 作为 Content Brief）
+python scripts/kb.py extract <document_id> --extractor topic_signal --llm-cmd "<LLM_COMMAND>"
+# 3) 通用写作（不需要 mapping、不需要伪造 case）
+python scripts/kb.py write --topic <topic_id> --mode guide --llm-cmd "<LLM_COMMAND>"
+# 4) 过门 + 输出（与案例写作一致）
+python scripts/kb.py audit --draft <draft_id> --llm-cmd "<LLM_COMMAND>"
+python scripts/kb.py output render --draft <draft_id>
+```
+
+> 政策数字、调查数据、时间节点、机构名称必须来自来源素材；来源没有的写清楚是「推断/建议」。严禁把通用内容捏造成学生案例。
+
 完整逐步说明见 `docs/user/quickstart.md`；典型工作流见 `docs/user/workflows.md`。
 
 ## 典型工作流

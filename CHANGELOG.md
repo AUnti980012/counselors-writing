@@ -2,6 +2,49 @@
 
 本仓库按 `docs/history/milestone-pack-v1.0.md` 的 M0→M9 协议演进。里程碑细节见 `docs/history/migration-plan.md`。
 
+## [2.2.0] - 2026-10-04
+
+M10.1 最终运行时加固 + M10.2 通用内容写作（Gray Release）：系统从「案例驱动写作」扩展为「案例驱动 + 通用校园内容」双入口，并修复灰度测试发现的三个问题（P2-1 / P2-2→P1 / P3-1）。
+
+### 版本号（四种语义分离）
+
+| 版本 | 值 | 含义 |
+|---|---|---|
+| Skill | **2.2.0** | 用户可见能力/行为（`--result` 绑定 + Retro 增量 + Generic Writing 入口） |
+| KB | **0.12.0** | CLI 接口（`write --topic` 通用路径 + `--profile/--sources` + `guide/commentary` mode） |
+| Schema | **1.1.0** | 数据契约（DraftRecord 新增 `mode` 字段，决定 audit 审核上下文） |
+| DB | 3（不变） | SQLite migration（无迁移；仅需 `db rebuild` 归位契约版本） |
+
+### M10.2 变更
+
+- **Generic Content Writing（P1，原 P2-2）**：`write` 现在支持两条入口——案例写作 `--mapping <id>`（必需，topic/analysis/style 可选增强），通用写作 `--topic <id>`（不需要 mapping、不需要 Case）。通用路径复用 TopicRecord 作 Content Brief，来源片段经 `repo.source_chunks` 有界投影（≤5 来源 × ≤8 块），lineage 记录 `topic_id + source_ids`（`case_ids=[]`、`mapping_id=None`），**严禁伪 Case**。
+- **P2-1 修复 — schema_summary 嵌套 $ref 展开**：`_json_type` 对 `array<$ref>` 展开一层必填字段（如 `angles → array<{name: string, score: number}>`），提高 LLM 一次通过率；深度上限 2 层，不把整个 JSON Schema 复制给模型。
+- **P3-1 修复 — audit mode 措辞**：`build_audit_prompt` 按 `draft.mode` 动态生成审核上下文（article→公众号推文 / report→内部工作材料 / guide→指南 / commentary→解读），并明确「无学生个案时 privacy 判 pass」。
+- **通用写作事实/推断规则**：政策数字/调查数据/时间节点/机构名称必须来自来源素材，来源没有的写清楚是推断；沿用 documented_fact/source_claim vs ai_inference 分离。
+- **DraftRecord 新增 `mode` 字段**：Python 注入，决定 audit 措辞；`_DRAFT_MANAGED_KEYS` 与 `_MANAGED_FIELDS["draft"]` 同步。
+- **缓存/id 幂等通用化**：`draft_id_for` 与 `writing_cache_key` 纳入 topic_id/source_ids/profile_id，通用写作同输入 cache hit 零 LLM。
+- **新增 mode**：`guide`（学生/辅导员指南）、`commentary`（热点/政策解读），与 `article/report/outline/topic_proposal` 共用同一 Output/Audit 引擎。
+
+### M10.2 测试
+
+全量测试必须通过：`python scripts/kb.py test`（当前基线 **484**；新增 16 条：通用写作 8 + schema_summary 6 + audit mode 2）。`python scripts/kb.py schemas export --check` 零漂移。
+
+### M10.1 变更
+
+- **Topic / Analysis / Mapping / Writing 语义收口（P0）**：`write --topic/--analysis/--style` 已确认真实进入实体读取 → 白名单投影 → prompt → lineage → draft_id；补 `test_topic_analysis_style_enter_prompt` 锁定。TopicRecord（`extract --extractor topic_signal`）与 AnalysisRecord（`analysis --case`）边界文档对齐。
+- **`--result` 误回灌保护（P0）**：新增 `ResultBindingError` + `input_digest` 绑定。`--prompt-only` 输出 `input_digest`；`--result` 文件可为原始实体 JSON（向后兼容）或绑定 wrapper `{operation, input_digest, result}`，wrapper 校验不匹配 → exit 2 拒绝写入。
+- **result round-trip 完整测试（P0）**：新增 `test_result_roundtrip.py`，覆盖 analysis/mapping/write/audit 的 `result` 回灌真实落盘 + 绑定不匹配拒绝 + 原始 JSON 向后兼容 + wrapper 解包。
+- **SQLite connection lifecycle 修复（P0）**：`cmd_fetch` / `cmd_ingest` / `cmd_artifact_create` / `cmd_artifact_status` 补 finally 关闭连接，消除 ResourceWarning 泄漏。
+- **`output render` 崩溃修复（P0，真实缺陷）**：`cmd_output_render` 使用 `default_extraction_deps()` 却从未 import（M6 遗留，成功路径从未被测试覆盖），一跑就 NameError。补 import + 回归锁。
+- **Audit 全文 Token 规则澄清（P0）**：硬规则从「禁止整文进 LLM」改为「禁止默认把整库/raw/历史/重复上下文回流；审核当前 Draft 时允许必要全文、受 `MAX_PROMPT_CHARS`=8000 上限约束」。
+- **Retro 改为增量触发（P1）**：交付正文 ≠ 强制复盘；只有存在新传播数据/用户反馈/有效写法/失败原因等增量时才沉淀，无增量不额外调用 LLM。
+- **发布包卫生（P1）**：`.gitignore` 补 `data/knowledge/*/`、`data/registry/`、`data/artifacts/` 运行时产物，避免运行后出现大量未跟踪文件。
+- **Runtime 文档去平台耦合 + 职责收口（P1）**：复核 SKILL/README/AGENTS/references/docs 职责分离，无平台专属硬编码。
+
+### M10.1 测试
+
+全量测试必须通过：`python scripts/kb.py test`（当前基线 **468**；新增 result round-trip 9 + write 语义 1 + output render 回归锁 1）。`python scripts/kb.py schemas export --check` 零漂移。
+
 ## [2.1.0] - 2026-10-04
 
 M10 产品化收口：把「工程重构完成」收口为「可长期交付给不同 Agent 与真实用户的产品」。

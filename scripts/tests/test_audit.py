@@ -139,6 +139,25 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(ptr["status"], "validation_failed",
                          "畸形 issues（dict 而非 list）必须校验失败，不得静默清零假通过")
 
+    def test_audit_mode_wording(self):
+        """P3-1 修复：审核上下文措辞随 mode 变化，不再一律「公众号推文」。"""
+        from core.audit import build_audit_prompt
+        self.assertIn("公众号推文", build_audit_prompt("正文", "标题", mode="article"))
+        p_report = build_audit_prompt("正文", "标题", mode="report")
+        self.assertIn("内部工作材料", p_report)
+        self.assertNotIn("公众号推文", p_report, "report 措辞不应再称「公众号推文」")
+        self.assertIn("指南", build_audit_prompt("正文", "标题", mode="guide"))
+
+    def test_audit_reads_draft_mode(self):
+        """draft.mode 决定审核上下文（P3-1）：report draft 走「内部工作材料」措辞。"""
+        self.repo.save_draft(DraftRecord(draft_id="drf-report", title="内部材料",
+                                         sections=[{"heading": "", "content": "内容"}],
+                                         mode="report"))
+        llm = self._llm([json.dumps(VALID_AUDIT, ensure_ascii=False)])
+        audit(draft_id="drf-report", llm_fn=llm, deps=self.deps)
+        self.assertTrue(any("内部工作材料" in p for p in llm.calls),
+                        "report 草稿审核应使用「内部工作材料」上下文")
+
 
 if __name__ == "__main__":
     unittest.main()

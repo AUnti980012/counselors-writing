@@ -3,7 +3,7 @@
   "description": "Artifact 契约：身份/血缘/保留策略。Artifact 是阶段间传递的指针载体。",
   "properties": {
     "schema_version": {
-      "default": "1.0.0",
+      "default": "1.1.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

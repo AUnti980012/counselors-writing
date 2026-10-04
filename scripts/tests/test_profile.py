@@ -11,6 +11,7 @@ from core import db
 from core.profile import (DEFAULT_PROFILE_ID, PROFILE_EDITABLE_KEYS, coerce_value,
                           get_profile_field, parse_value, set_profile_field)
 from core.repo import Repository
+from core.schema import SCHEMA_VERSION
 
 
 class ProfileTests(unittest.TestCase):
@@ -62,7 +63,7 @@ class ProfileTests(unittest.TestCase):
     def test_updated_at_managed_on_set(self):
         rec = set_profile_field(self.repo, "school_name", "某高校")
         self.assertIsNotNone(rec.updated_at.tzinfo, "updated_at 必须带时区")
-        self.assertEqual(rec.schema_version, "1.0.0")
+        self.assertEqual(rec.schema_version, SCHEMA_VERSION)
 
     # ---- 审查回归锁 ----
 

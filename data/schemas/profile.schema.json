@@ -61,7 +61,7 @@
   "description": "学校画像契约：7 键白名单（对应 V1 school.json），extra=forbid 拒绝未知键。",
   "properties": {
     "schema_version": {
-      "default": "1.0.0",
+      "default": "1.1.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

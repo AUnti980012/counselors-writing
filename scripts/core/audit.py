@@ -53,10 +53,25 @@ _GROUP_CHECKS = {
 }
 _FATAL_CHECKS = {"political", "factual", "privacy"}
 
-_INSTRUCTION = (
-    "你是高校思政工作的独立审校。对下面这篇辅导员公众号推文逐项检查，"
-    "给出每一项的 verdict（pass/warn/fail）+ 具体到句子的 note + location。"
-    "不要放行政治方向/事实依据/学生隐私任一 fail；学生隐私信息必须脱敏后再写入 note。")
+# 审核上下文措辞：按内容形态（draft.mode）动态生成，避免把内部材料/指南/评论
+# 一律当作「公众号推文」（P3-1 修复）。纯政策/指南无学生个案时 privacy 判 pass。
+_AUDIT_CONTEXT = {
+    "article": "对下面这篇拟发布的公众号推文逐项检查",
+    "report": "对下面这份内部工作材料逐项检查",
+    "outline": "对下面这份内容提纲逐项检查",
+    "topic_proposal": "对下面这份选题提案逐项检查",
+    "guide": "对下面这份学生/辅导员指南逐项检查",
+    "commentary": "对下面这篇热点/政策解读逐项检查",
+}
+
+
+def _audit_instruction(mode: str) -> str:
+    context = _AUDIT_CONTEXT.get(mode, "对下面这篇内容逐项检查")
+    return (
+        "你是高校思政工作的独立审校。" + context + "，"
+        "给出每一项的 verdict（pass/warn/fail）+ 具体到句子的 note + location。"
+        "不要放行政治方向/事实依据/学生隐私任一 fail；学生隐私信息必须脱敏后再写入 note。"
+        "内容不含学生个案时，privacy 判 pass（不要因为「没有匿名学生案例」判 fail）。")
 
 
 class AuditInputError(ValueError):
@@ -128,9 +143,9 @@ def _aggregate_groups(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def build_audit_prompt(fulltext: str, draft_title: str,
-                       model_mode: str = "economy") -> str:
-    """审核 prompt：七项清单指令 + schema 摘要 + draft 全文。"""
-    fixed_lines = [_INSTRUCTION]
+                       model_mode: str = "economy", mode: str = "article") -> str:
+    """审核 prompt：七项清单指令（按 mode 措辞）+ schema 摘要 + draft 全文。"""
+    fixed_lines = [_audit_instruction(mode)]
     if model_mode == "economy":
         fixed_lines.append("（economy 模式：直接、简洁地审核，逐项给结论。）")
     fixed_lines.append("\n## 输出 JSON 字段清单（只输出这些字段，不要输出 id/时间戳/分组/结论等托管字段）")
@@ -153,7 +168,7 @@ def build_audit_prompt(fulltext: str, draft_title: str,
 
     fixed = "\n".join(fixed_lines)
     # draft 全文有界；超预算截断（保留头部，审核对象优先标题+开头）
-    draft_block = f"\n## 待审核推文（标题：{draft_title}）\n{fulltext}"
+    draft_block = f"\n## 待审核内容（标题：{draft_title}）\n{fulltext}"
     budget = max(1, MAX_PROMPT_CHARS - len(fixed) - len(tail))
     if len(draft_block) > budget:
         draft_block = draft_block[:budget] + "\n（推文已截断，基于可见部分审核）"
@@ -220,7 +235,8 @@ def audit(*, draft_id: str, llm_fn: Callable[[str], str],
                 return ptr
 
     punctuation_issues = _punctuation_issues(fulltext)
-    base_prompt = build_audit_prompt(fulltext, draft.title, model_mode)
+    base_prompt = build_audit_prompt(fulltext, draft.title, model_mode,
+                                     mode=getattr(draft, "mode", "article") or "article")
 
     success_data: Optional[Dict[str, Any]] = None
     errors: List[ErrorDetail] = []

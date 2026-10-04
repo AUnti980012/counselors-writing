@@ -6,6 +6,8 @@ import sys
 import unittest
 from pathlib import Path
 
+from core.schema import SCHEMA_VERSION
+
 SCRIPTS = Path(__file__).resolve().parents[1]
 KB = SCRIPTS / "kb.py"
 BOOTSTRAP = SCRIPTS / "bootstrap.py"
@@ -60,7 +62,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         out = json.loads(r.stdout)
         self.assertIn("schema_version", out)
-        self.assertEqual(out["schema_version"], "1.0.0")
+        self.assertEqual(out["schema_version"], SCHEMA_VERSION)
 
     def test_bootstrap_exit_0(self):
         r = run(BOOTSTRAP)
@@ -250,6 +252,14 @@ class M6CliUsageTests(unittest.TestCase):
     def test_output_render_requires_draft(self):
         r = run(KB, "output", "render")
         self.assertEqual(r.returncode, 4, r.stderr)
+
+    def test_output_render_missing_draft_no_nameerror(self):
+        """回归锁：output render 曾因缺 import 抛 NameError（M10.1 修复）。
+        必须走到「数据缺失 exit 1」而非解释器崩溃。"""
+        r = run(KB, "output", "render", "--draft", "drf-nonexistent")
+        self.assertEqual(r.returncode, 1, r.stderr)
+        self.assertNotIn("NameError", r.stderr)
+        self.assertIn("不存在", r.stderr)
 
     def test_context_for_write_requires_mapping(self):
         r = run(KB, "context-for-write")

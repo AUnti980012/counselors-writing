@@ -22,7 +22,7 @@ from typing import Annotated, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 
 # ---- 模式常量 ----
 ID_PATTERN = r"^[a-z0-9][a-z0-9_-]{2,63}$"
@@ -785,6 +785,8 @@ class DraftRecord(StampedRecord):
     claims: List[FactClaim] = Field(default_factory=list, max_length=100,
                                     description="主要事实性断言（逐条标注 fact_type + 证据）")
     status: DRAFT_STATUS = "draft"
+    mode: str = Field(default="article", max_length=32,
+                      description="内容形态（article/report/outline/topic_proposal/guide/commentary；Python 注入，决定 audit 审核上下文）")
 
 
 # ---- 实体 15：Extraction（M4 提取运行记录） ----

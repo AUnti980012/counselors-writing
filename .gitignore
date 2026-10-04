@@ -13,6 +13,24 @@ data/case_library/
 data/profiles/
 data/style_library/
 data/backups/
+data/registry/
+data/artifacts/
+
+# 运行时知识实体（canonical 文件由运行生成；data/knowledge/styles/seed.json
+# 与 data/schemas/*.json 为源码、已被 git 跟踪，不受影响）
+data/knowledge/cases/
+data/knowledge/chunks/
+data/knowledge/documents/
+data/knowledge/evidence/
+data/knowledge/sources/
+data/knowledge/analyses/
+data/knowledge/mappings/
+data/knowledge/profiles/
+data/knowledge/audits/
+data/knowledge/effects/
+data/knowledge/articles/
+data/knowledge/topics/
+data/knowledge/styles/
 
 # 系统
 .DS_Store

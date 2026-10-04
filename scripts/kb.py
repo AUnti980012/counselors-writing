@@ -51,7 +51,7 @@ except ImportError as exc:  # 依赖缺失（pydantic 未安装）
     print("安装指引：python -m pip install 'pydantic>=2'", file=sys.stderr)
     sys.exit(EXIT_DEPENDENCY)
 
-KB_VERSION = "0.10.0"  # M10：Agent Adapter Contract（--result 回灌，统一三模式）
+KB_VERSION = "0.12.0"  # M10.2：通用写作（write --topic 无 mapping）+ schema_summary 嵌套 $ref + audit mode 措辞
 
 ENTITY_NAMES = sorted(ENTITIES)
 
@@ -60,16 +60,26 @@ def _print_json(obj) -> None:
     print(json.dumps(obj, ensure_ascii=False, indent=2, default=str))
 
 
-def _llm_fn(args: argparse.Namespace):
+def _request_digest(*parts) -> str:
+    """--result 误回灌保护的 request 绑定摘要（operation + 请求输入 id）。"""
+    import hashlib
+
+    seed = "|".join("" if p is None else str(p) for p in parts)
+    return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
+
+
+def _llm_fn(args: argparse.Namespace, operation: str, input_digest: str):
     """--llm-cmd / --result 二选一 → llm_fn；两者都缺返回 None（--prompt-only 由上层分支处理）。
 
     --result 用 llm_fn_from_file（读 Agent 已产出的 JSON 文件），与 --llm-cmd
-    走完全相同的 parse → inject → validate → persist 路径，不复制写入逻辑。
+    走完全相同的 parse → inject → validate → persist 路径，不复制写入逻辑；
+    并带 operation/input_digest 绑定校验（M10.1 误回灌保护）。
     """
     from core.extract import llm_fn_from_cmd, llm_fn_from_file
 
     if getattr(args, "result", None):
-        return llm_fn_from_file(args.result)
+        return llm_fn_from_file(args.result, expected_operation=operation,
+                                expected_input_digest=input_digest)
     if getattr(args, "llm_cmd", None):
         return llm_fn_from_cmd(args.llm_cmd)
     return None
@@ -144,17 +154,22 @@ def cmd_version(_args: argparse.Namespace) -> int:
 # ---- M2：artifact ----
 
 def _artifact_store():
-    """ArtifactStore + 可选索引投影同步（create/set_status 后自动 upsert artifacts 表）。"""
+    """ArtifactStore + 可选索引投影同步（create/set_status 后自动 upsert artifacts 表）。
+
+    返回 (store, repo)：repo 可能为 None（索引库未初始化）；调用方负责在 finally
+    中关闭 repo.conn（M10.1 连接生命周期：不得留下未关闭的 SQLite 连接）。
+    """
     from core.artifact import ArtifactStore
 
     repo = _optional_repo()
-    return ArtifactStore(index_sync=repo.upsert_artifact if repo else None)
+    return ArtifactStore(index_sync=repo.upsert_artifact if repo else None), repo
 
 
 def _optional_repo():
     """索引库已初始化时返回 Repository（artifact 同步用）；否则 None。
 
-    进程一次性 CLI：连接随进程退出关闭，不显式 close。
+    调用方（_artifact_store 的调用者）负责在 finally 中关闭 repo.conn
+    （M10.1 连接生命周期：不得留下未关闭的 SQLite 连接）。
     """
     import sqlite3
 
@@ -179,7 +194,7 @@ def _optional_repo():
 def cmd_artifact_create(args: argparse.Namespace) -> int:
     from core.artifact import ArtifactStore
 
-    store = _artifact_store()
+    store, repo = _artifact_store()
     if args.file:
         with open(args.file, "rb") as f:
             content = f.read()
@@ -211,6 +226,9 @@ def cmd_artifact_create(args: argparse.Namespace) -> int:
         print(json.dumps({"valid": False, "errors": [{"path": "$", "message": str(exc)}]},
                          ensure_ascii=False, indent=2))
         return EXIT_INVALID
+    finally:
+        if repo is not None:
+            repo.conn.close()
     result = record.model_dump(mode="json")
     result["reused"] = reused
     _print_json(result)
@@ -238,7 +256,7 @@ def cmd_artifact_get(args: argparse.Namespace) -> int:
 
 
 def cmd_artifact_status(args: argparse.Namespace) -> int:
-    store = _artifact_store()  # index_sync：状态流转同步 artifacts 投影表
+    store, repo = _artifact_store()  # index_sync：状态流转同步 artifacts 投影表
     try:
         record = store.set_status(args.artifact_id, args.status)
     except KeyError:
@@ -247,6 +265,9 @@ def cmd_artifact_status(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return EXIT_INVALID
+    finally:
+        if repo is not None:
+            repo.conn.close()
     _print_json(record.model_dump(mode="json"))
     return EXIT_OK
 
@@ -396,8 +417,8 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     from core.fetcher import FetchBlocked
     from core.pipeline import acquire_url, default_deps
 
+    deps = default_deps()
     try:
-        deps = default_deps()
         ptr = acquire_url(args.url, backend=args.backend,
                           use_cache=not args.no_cache, deps=deps)
     except FetchBlocked as exc:
@@ -409,6 +430,8 @@ def cmd_fetch(args: argparse.Namespace) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         print(f"抓取失败：[{exc.status}] {exc.reason}", file=sys.stderr)
         return EXIT_ERROR
+    finally:
+        deps.repo.conn.close()  # M10.1 连接生命周期：default_deps 打开的 conn 必须关闭
     _print_json(ptr)
     return EXIT_OK
 
@@ -429,12 +452,15 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     if not text.strip():
         print("错误：没有输入内容（stdin 为空且未提供 --file）", file=sys.stderr)
         return EXIT_USAGE
+    deps = default_deps()
     try:
-        ptr = ingest_text(text, url=args.url, title=args.title)
+        ptr = ingest_text(text, url=args.url, title=args.title, deps=deps)
     except FetchBlocked as exc:
         print(json.dumps(exc.to_dict(), ensure_ascii=False, indent=2))
         print(f"导入失败：[{exc.status}] {exc.reason}", file=sys.stderr)
         return EXIT_ERROR
+    finally:
+        deps.repo.conn.close()  # M10.1 连接生命周期：default_deps 打开的 conn 必须关闭
     _print_json(ptr)
     return EXIT_OK
 
@@ -456,9 +482,12 @@ def cmd_extract(args: argparse.Namespace) -> int:
     否则用 --llm-cmd 外部命令跑完整自纠正循环（stdin 传 prompt、stdout 收 JSON）。
     """
     from core.extract import (EXTRACTOR_ENTITY, MAX_CHUNKS_IN_PROMPT,
-                              ExtractionInputError, LLMCallError,
+                              ExtractionInputError, LLMCallError, ResultBindingError,
                               build_extraction_prompt, default_extraction_deps,
                               extract)
+
+    input_digest = _request_digest("extract", args.document_id, args.extractor,
+                                   args.model_mode)
 
     if args.prompt_only:
         deps = default_extraction_deps()
@@ -479,6 +508,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
                               "request": {"document_id": args.document_id,
                                           "extractor": args.extractor,
                                           "model_mode": args.model_mode},
+                              "input_digest": input_digest,
                               "expected_output": EXTRACTOR_ENTITY[args.extractor],
                               "truncated": truncated, "prompt": prompt},
                              ensure_ascii=False, indent=2))
@@ -486,7 +516,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
         finally:
             deps.conn.close()
 
-    llm_fn = _llm_fn(args)
+    llm_fn = _llm_fn(args, "extract", input_digest)
     if llm_fn is None:
         print(_MODE_ERR, file=sys.stderr)
         return EXIT_DEPENDENCY
@@ -499,6 +529,9 @@ def cmd_extract(args: argparse.Namespace) -> int:
     except ExtractionInputError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return EXIT_ERROR  # 数据缺失（document/chunk 不存在）——运行时数据错误，非用法错误
+    except ResultBindingError as exc:
+        print(f"错误：结果绑定不一致：{exc}", file=sys.stderr)
+        return EXIT_INVALID  # 误回灌保护：结果与当前请求不匹配 exit 2
     except LLMCallError as exc:
         print(f"错误：LLM 调用失败（dependency_failed）：{exc}", file=sys.stderr)
         return EXIT_DEPENDENCY  # LLM 依赖失败 exit 3（契约）
@@ -627,7 +660,7 @@ def cmd_style_add(args: argparse.Namespace) -> int:
 def _analysis_or_mapping(args: argparse.Namespace, kind: str) -> int:
     """analysis / mapping 共用编排（LLM 任务：--prompt-only / --llm-cmd / --result）。"""
     from core.analysis import AnalysisInputError, _case_projection, analyze
-    from core.extract import LLMCallError, default_extraction_deps
+    from core.extract import LLMCallError, ResultBindingError, default_extraction_deps
     from core.mapping import map_to_profile
 
     if kind == "mapping" and not args.profile:
@@ -636,6 +669,10 @@ def _analysis_or_mapping(args: argparse.Namespace, kind: str) -> int:
     if len(args.case) > 20:
         print(f"错误：输入案例数超上限（{len(args.case)} > 20）", file=sys.stderr)
         return EXIT_USAGE
+
+    input_digest = _request_digest(
+        kind, *sorted(args.case),
+        args.profile if kind == "mapping" else None, args.model_mode)
 
     if args.prompt_only:
         # 只输出最小 prompt（供 Agent 编排/调试），不调用 LLM
@@ -665,12 +702,13 @@ def _analysis_or_mapping(args: argparse.Namespace, kind: str) -> int:
             if kind == "mapping":
                 request["profile"] = args.profile
             _print_json({"operation": kind, "schema_version": SCHEMA_VERSION,
-                         "request": request, "expected_output": kind, "prompt": prompt})
+                         "request": request, "input_digest": input_digest,
+                         "expected_output": kind, "prompt": prompt})
             return EXIT_OK
         finally:
             conn.close()
 
-    llm_fn = _llm_fn(args)
+    llm_fn = _llm_fn(args, kind, input_digest)
     if llm_fn is None:
         print(_MODE_ERR, file=sys.stderr)
         return EXIT_DEPENDENCY
@@ -685,6 +723,9 @@ def _analysis_or_mapping(args: argparse.Namespace, kind: str) -> int:
             ptr = analyze(case_ids=args.case, llm_fn=llm_fn,
                           deps=deps, model_mode=args.model_mode,
                           use_cache=not args.no_cache)
+    except ResultBindingError as exc:
+        print(f"错误：结果绑定不一致：{exc}", file=sys.stderr)
+        return EXIT_INVALID  # 误回灌保护：结果与当前请求不匹配 exit 2
     except LLMCallError as exc:
         print(f"错误：LLM 调用失败（dependency_failed）：{exc}", file=sys.stderr)
         return EXIT_DEPENDENCY
@@ -752,12 +793,45 @@ def _write_context_prompt(args, repo):
     与 cmd_write --prompt-only 用同一份逻辑（审计输出 = 实际注入内容）。
     """
     from core.mapping import _profile_projection
-    from core.writer import (WRITE_MODES, _analysis_projection, _mapping_projection,
-                             _style_projection, _topic_projection,
-                             _write_case_projection, build_write_prompt)
+    from core.writer import (WRITE_MODES, _MAX_SOURCES, _MAX_SOURCE_SNIPPETS,
+                             _analysis_projection, _generic_topic_projection,
+                             _mapping_projection, _source_projection, _style_projection,
+                             _topic_projection, _write_case_projection,
+                             build_generic_write_prompt, build_write_prompt)
 
     if args.mode not in WRITE_MODES:
         return None, f"未知写作模式 {args.mode!r}（可用：{WRITE_MODES}）"
+    if not args.mapping and not args.topic:
+        return None, "write 需要 --mapping（案例写作）或 --topic（通用写作）"
+
+    if not args.mapping:
+        # 通用写作路径（无 mapping）：topic + 来源片段 + 可选 style/profile
+        topic = repo.get_topic(args.topic)
+        if topic is None:
+            return None, f"topic 不存在：{args.topic}（先 kb.py extract --extractor topic_signal 产出选题）"
+        source_ids = [s.strip() for s in (args.sources or "").split(",") if s.strip()]
+        if not source_ids:
+            source_ids = list(topic.source_basis.source_ids)
+        sources = []
+        for sid in source_ids[:_MAX_SOURCES]:
+            src = repo.get_source(sid)
+            if src is None:
+                return None, f"source 不存在：{sid}"
+            sources.append(_source_projection(
+                src, repo.source_chunks(sid, limit=_MAX_SOURCE_SNIPPETS)))
+        style = repo.get_style(args.style) if args.style else None
+        if args.style and style is None:
+            return None, f"style 不存在：{args.style}"
+        profile = repo.get_profile(args.profile) if args.profile else None
+        prompt = build_generic_write_prompt(
+            topic=_generic_topic_projection(topic), sources=sources,
+            style=_style_projection(style) if style else None,
+            profile=_profile_projection(profile) if profile else None,
+            mode=args.mode, model_mode=args.model_mode)
+        whitelist = {"topic_id": args.topic, "source_ids": source_ids,
+                     "style_id": args.style, "profile_id": args.profile, "case_ids": []}
+        return {"prompt": prompt, "whitelist": whitelist}, None
+
     mapping = repo.get_mapping(args.mapping)
     if mapping is None:
         return None, f"mapping 不存在：{args.mapping}（先 kb.py mapping 产出映射）"
@@ -812,8 +886,12 @@ def cmd_context_for_write(args):
 
 def cmd_write(args):
     """LLM 写作：白名单上下文 → DraftRecord（--llm-cmd / --result / --prompt-only）。"""
-    from core.extract import LLMCallError, default_extraction_deps
+    from core.extract import LLMCallError, ResultBindingError, default_extraction_deps
     from core.writer import WriteInputError, write
+
+    input_digest = _request_digest("write", args.mapping, args.mode, args.model_mode,
+                                   args.topic, args.analysis, args.style,
+                                   args.profile, args.sources)
 
     if args.prompt_only:
         conn, repo = _open_repo()
@@ -825,24 +903,31 @@ def cmd_write(args):
             _print_json({"operation": "write", "schema_version": SCHEMA_VERSION,
                          "request": {"mapping_id": args.mapping, "mode": args.mode,
                                      "topic_id": args.topic, "analysis_id": args.analysis,
-                                     "style_id": args.style},
+                                     "style_id": args.style, "profile_id": args.profile,
+                                     "source_ids": args.sources},
+                         "input_digest": input_digest,
                          "expected_output": "draft",
                          "prompt": result["prompt"]})
             return EXIT_OK
         finally:
             conn.close()
 
-    llm_fn = _llm_fn(args)
+    llm_fn = _llm_fn(args, "write", input_digest)
     if llm_fn is None:
         print(_MODE_ERR, file=sys.stderr)
         return EXIT_DEPENDENCY
 
     deps = default_extraction_deps()
     try:
-        ptr = write(mapping_id=args.mapping, llm_fn=llm_fn,
-                    deps=deps, topic_id=args.topic, analysis_id=args.analysis,
-                    style_id=args.style, mode=args.mode, model_mode=args.model_mode,
+        source_ids = [s.strip() for s in (args.sources or "").split(",") if s.strip()] or None
+        ptr = write(mapping_id=args.mapping, topic_id=args.topic, llm_fn=llm_fn,
+                    deps=deps, analysis_id=args.analysis, style_id=args.style,
+                    profile_id=args.profile, source_ids=source_ids,
+                    mode=args.mode, model_mode=args.model_mode,
                     use_cache=not args.no_cache)
+    except ResultBindingError as exc:
+        print(f"错误：结果绑定不一致：{exc}", file=sys.stderr)
+        return EXIT_INVALID  # 误回灌保护：结果与当前请求不匹配 exit 2
     except LLMCallError as exc:
         print(f"错误：LLM 调用失败（dependency_failed）：{exc}", file=sys.stderr)
         return EXIT_DEPENDENCY
@@ -865,7 +950,9 @@ def cmd_audit(args):
     """LLM 七项自查 + 标点门禁 → AuditRecord（单通道，C-07；三模式）。"""
     from core.audit import (AuditInputError, _draft_fulltext, audit,
                             build_audit_prompt)
-    from core.extract import LLMCallError, default_extraction_deps
+    from core.extract import LLMCallError, ResultBindingError, default_extraction_deps
+
+    input_digest = _request_digest("audit", args.draft, args.model_mode)
 
     if args.prompt_only:
         conn, repo = _open_repo()
@@ -877,14 +964,16 @@ def cmd_audit(args):
             _print_json({"operation": "audit", "schema_version": SCHEMA_VERSION,
                          "request": {"draft_id": args.draft,
                                      "model_mode": args.model_mode},
+                         "input_digest": input_digest,
                          "expected_output": "audit",
                          "prompt": build_audit_prompt(_draft_fulltext(draft),
-                                                      draft.title, args.model_mode)})
+                                                      draft.title, args.model_mode,
+                                                      mode=getattr(draft, "mode", "article") or "article")})
             return EXIT_OK
         finally:
             conn.close()
 
-    llm_fn = _llm_fn(args)
+    llm_fn = _llm_fn(args, "audit", input_digest)
     if llm_fn is None:
         print(_MODE_ERR, file=sys.stderr)
         return EXIT_DEPENDENCY
@@ -893,6 +982,9 @@ def cmd_audit(args):
     try:
         ptr = audit(draft_id=args.draft, llm_fn=llm_fn,
                     deps=deps, model_mode=args.model_mode, use_cache=not args.no_cache)
+    except ResultBindingError as exc:
+        print(f"错误：结果绑定不一致：{exc}", file=sys.stderr)
+        return EXIT_INVALID  # 误回灌保护：结果与当前请求不匹配 exit 2
     except LLMCallError as exc:
         print(f"错误：LLM 调用失败（dependency_failed）：{exc}", file=sys.stderr)
         return EXIT_DEPENDENCY
@@ -947,6 +1039,7 @@ def cmd_punctuation(args):
 
 def cmd_output_render(args):
     """draft → 最终 Markdown → FINAL artifact（零 LLM，换格式重渲染不重研究）。"""
+    from core.extract import default_extraction_deps
     from core.output import OutputInputError, finalize
 
     template = None
@@ -1325,18 +1418,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_ctx.add_argument("--analysis", help="可选分析 id")
     p_ctx.add_argument("--style", help="可选风格 id")
     p_ctx.add_argument("--mode", default="article",
-                       choices=["article", "report", "outline", "topic_proposal"])
+                       choices=["article", "report", "outline", "topic_proposal",
+                                "guide", "commentary"])
     p_ctx.add_argument("--model-mode", default="economy",
                        choices=["economy", "standard", "deep"])
     p_ctx.set_defaults(func=cmd_context_for_write)
 
-    p_write = sub.add_parser("write", help="LLM 写作：白名单上下文 → DraftRecord")
-    p_write.add_argument("--mapping", required=True, help="映射 id（写作白名单入口）")
-    p_write.add_argument("--topic", help="可选选题 id")
-    p_write.add_argument("--analysis", help="可选分析 id")
+    p_write = sub.add_parser("write", help="LLM 写作：白名单上下文 → DraftRecord（案例 --mapping / 通用 --topic）")
+    p_write.add_argument("--mapping", help="映射 id（案例写作入口；无 --mapping 时走通用写作）")
+    p_write.add_argument("--topic", help="选题 id（通用写作入口；无 --mapping 时必填）")
+    p_write.add_argument("--analysis", help="可选分析 id（仅案例写作）")
     p_write.add_argument("--style", help="可选风格 id")
+    p_write.add_argument("--profile", help="可选学校画像 id（通用写作；缺省不注入画像）")
+    p_write.add_argument("--sources", help="可选来源 id，逗号分隔（通用写作；缺省回退选题 source_basis）")
     p_write.add_argument("--mode", default="article",
-                         choices=["article", "report", "outline", "topic_proposal"])
+                         choices=["article", "report", "outline", "topic_proposal",
+                                  "guide", "commentary"])
     _add_llm_modes(p_write)
     p_write.add_argument("--model-mode", default="economy",
                          choices=["economy", "standard", "deep"])

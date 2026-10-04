@@ -45,7 +45,7 @@
   "description": "风格知识契约：只描述写作/传播特征，不存储整篇文章。",
   "properties": {
     "schema_version": {
-      "default": "1.0.0",
+      "default": "1.1.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

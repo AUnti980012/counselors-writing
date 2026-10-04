@@ -221,5 +221,34 @@ class WriterTests(unittest.TestCase):
         self.assertIn("匿名收集降低表达门槛", prompt)
 
 
+    def test_topic_analysis_style_enter_prompt(self):
+        """P0 3.2：write --topic/--analysis/--style 提供后，投影内容真实进入写作 prompt
+        （不得是「CLI 接受参数但 prompt 没用」的装饰参数）。"""
+        from core.mapping import _profile_projection
+        from core.writer import build_write_prompt
+        prompt = build_write_prompt(
+            mapping={"transferable_elements": ["提问式引导"], "differences": [],
+                     "rationale": ""},
+            profile=_profile_projection(self.repo.get_profile("pro-school")),
+            cases=[{"case_id": "case-a", "title": "班会案例", "problem": "",
+                    "background": "", "events": [], "methods": "", "results": "",
+                    "transferable_patterns": [], "writing_features": "", "facts": []}],
+            style={"style_id": "style-a", "structure": "白描开头、对话还原、金句收尾。",
+                   "tone": "口语化", "sentence_features": [], "paragraph_features": [],
+                   "title_patterns": ["事件反问"], "opening_patterns": [],
+                   "ending_patterns": [], "narrative_patterns": [],
+                   "communication_features": []},
+            topic={"topic_id": "top-a", "title": "选题", "summary": "",
+                   "hook": "一次班会三个问题。", "value_landing": "提问比灌输更唤醒学生。"},
+            analysis={"analysis_id": "ana-a", "topic": "",
+                      "patterns": ["提问式引导更有效"], "transferable_methods": [],
+                      "recommendations": []},
+            mode="article")
+        self.assertIn("一次班会三个问题。", prompt, "topic hook 必须进入 prompt")
+        self.assertIn("提问比灌输更唤醒学生。", prompt, "topic value_landing 必须进入 prompt")
+        self.assertIn("提问式引导更有效", prompt, "analysis pattern 必须进入 prompt")
+        self.assertIn("白描开头、对话还原、金句收尾。", prompt, "style structure 必须进入 prompt")
+
+
 if __name__ == "__main__":
     unittest.main()
