@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "ModelMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "default": "",
+          "maxLength": 100,
+          "title": "Model",
+          "type": "string"
+        },
+        "mode": {
+          "default": "economy",
+          "enum": [
+            "economy",
+            "standard",
+            "deep"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Temperature"
+        }
+      },
+      "title": "ModelMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "提取运行契约：失败不丢弃源，保留 input refs + 校验错误（M4 自纠正 ≤2 次后标 failed）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "extraction_id": {
+      "description": "推荐前缀 ext-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Extraction Id",
+      "type": "string"
+    },
+    "extractor": {
+      "enum": [
+        "case_facts",
+        "style_pattern",
+        "topic_signal",
+        "hot_interface",
+        "media_style"
+      ],
+      "title": "Extractor",
+      "type": "string"
+    },
+    "input_refs": {
+      "additionalProperties": {
+        "items": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "description": "artifact_ids / document_ids / chunk_ids",
+      "maxProperties": 3,
+      "title": "Input Refs",
+      "type": "object"
+    },
+    "output_refs": {
+      "additionalProperties": {
+        "items": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "description": "case_ids / style_ids / topic_ids",
+      "maxProperties": 3,
+      "title": "Output Refs",
+      "type": "object"
+    },
+    "status": {
+      "default": "success",
+      "enum": [
+        "success",
+        "extraction_failed",
+        "validation_failed",
+        "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "attempts": {
+      "default": 1,
+      "description": "自纠正上限：初次 + ≤2 次修正",
+      "maximum": 3,
+      "minimum": 0,
+      "title": "Attempts",
+      "type": "integer"
+    },
+    "validation_errors": {
+      "description": "[{path,message,type}]（机器可读，供自纠正循环消费）",
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "maxItems": 50,
+      "title": "Validation Errors",
+      "type": "array"
+    },
+    "model_metadata": {
+      "$ref": "#/$defs/ModelMetadata",
+      "default": {
+        "model": "",
+        "mode": "economy",
+        "temperature": null
+      }
+    }
+  },
+  "required": [
+    "extraction_id",
+    "extractor"
+  ],
+  "title": "ExtractionRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

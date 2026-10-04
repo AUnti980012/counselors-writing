@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "AuditIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "check": {
+          "description": "七项自查（political/factual/value/labeling/ai_trace/privacy/copyright）+ 标点/格式",
+          "enum": [
+            "political",
+            "factual",
+            "value",
+            "labeling",
+            "ai_trace",
+            "privacy",
+            "copyright",
+            "punctuation",
+            "format"
+          ],
+          "title": "Check",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "warn",
+            "fail"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        },
+        "location": {
+          "default": "",
+          "description": "问题定位（段落/句子引用）",
+          "maxLength": 200,
+          "title": "Location",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "check",
+        "verdict"
+      ],
+      "title": "AuditIssue",
+      "type": "object"
+    },
+    "CheckGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "passed": {
+          "default": true,
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "notes": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Notes",
+          "type": "string"
+        }
+      },
+      "title": "CheckGroup",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "审核契约（单通道：七项结构化自查 + 标点门禁；无第二意见列）。\n\n分组映射：fact_check=[political, factual]；style_check=[value, labeling, ai_trace]；\nformat_check=[punctuation, format]；risk_check=[privacy, copyright]。\nverdict 硬规则：political/factual/privacy 任一 fail → passed 必须为 false。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "audit_id": {
+      "description": "推荐前缀 aud-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Audit Id",
+      "type": "string"
+    },
+    "draft_id": {
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Draft Id",
+      "type": "string"
+    },
+    "issues": {
+      "items": {
+        "$ref": "#/$defs/AuditIssue"
+      },
+      "maxItems": 100,
+      "title": "Issues",
+      "type": "array"
+    },
+    "fact_check": {
+      "$ref": "#/$defs/CheckGroup",
+      "default": {
+        "passed": true,
+        "notes": ""
+      }
+    },
+    "style_check": {
+      "$ref": "#/$defs/CheckGroup",
+      "default": {
+        "passed": true,
+        "notes": ""
+      }
+    },
+    "format_check": {
+      "$ref": "#/$defs/CheckGroup",
+      "default": {
+        "passed": true,
+        "notes": ""
+      }
+    },
+    "risk_check": {
+      "$ref": "#/$defs/CheckGroup",
+      "default": {
+        "passed": true,
+        "notes": ""
+      }
+    },
+    "passed": {
+      "default": true,
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "summary": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "audit_id",
+    "draft_id"
+  ],
+  "title": "AuditRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

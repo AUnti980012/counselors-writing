@@ -1,0 +1,215 @@
+{
+  "$defs": {
+    "DifferenceItem": {
+      "additionalProperties": false,
+      "properties": {
+        "difference": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Difference",
+          "type": "string"
+        },
+        "case_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "profile_field": {
+          "default": "",
+          "maxLength": 50,
+          "title": "Profile Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "difference"
+      ],
+      "title": "DifferenceItem",
+      "type": "object"
+    },
+    "MatchingPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "point": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Point",
+          "type": "string"
+        },
+        "case_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "profile_field": {
+          "default": "",
+          "maxLength": 50,
+          "title": "Profile Field",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "point"
+      ],
+      "title": "MatchingPoint",
+      "type": "object"
+    },
+    "RiskItem": {
+      "additionalProperties": false,
+      "properties": {
+        "risk": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Risk",
+          "type": "string"
+        },
+        "level": {
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "risk"
+      ],
+      "title": "RiskItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "案例 × 学校画像映射契约：外部成功案例 ≠ 本地可直接套用。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "mapping_id": {
+      "description": "推荐前缀 map-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Mapping Id",
+      "type": "string"
+    },
+    "case_ids": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+        "type": "string"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Case Ids",
+      "type": "array"
+    },
+    "profile_id": {
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Profile Id",
+      "type": "string"
+    },
+    "matching_points": {
+      "items": {
+        "$ref": "#/$defs/MatchingPoint"
+      },
+      "maxItems": 20,
+      "title": "Matching Points",
+      "type": "array"
+    },
+    "differences": {
+      "items": {
+        "$ref": "#/$defs/DifferenceItem"
+      },
+      "maxItems": 20,
+      "title": "Differences",
+      "type": "array"
+    },
+    "adaptation_requirements": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Adaptation Requirements",
+      "type": "array"
+    },
+    "transferable_elements": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Transferable Elements",
+      "type": "array"
+    },
+    "non_transferable_elements": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Non Transferable Elements",
+      "type": "array"
+    },
+    "risks": {
+      "items": {
+        "$ref": "#/$defs/RiskItem"
+      },
+      "maxItems": 20,
+      "title": "Risks",
+      "type": "array"
+    },
+    "rationale": {
+      "default": "",
+      "maxLength": 3000,
+      "title": "Rationale",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mapping_id",
+    "case_ids",
+    "profile_id"
+  ],
+  "title": "MappingRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

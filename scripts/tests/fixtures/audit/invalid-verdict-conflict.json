@@ -1,0 +1,18 @@
+{
+  "audit_id": "aud-bad-verdict",
+  "draft_id": "drf-demo-0001",
+  "issues": [
+    {
+      "check": "privacy",
+      "verdict": "fail",
+      "note": "出现可定位学生身份的学号。",
+      "location": "第一段",
+      "evidence_ids": []
+    }
+  ],
+  "fact_check": {"passed": true, "notes": ""},
+  "style_check": {"passed": true, "notes": ""},
+  "format_check": {"passed": true, "notes": ""},
+  "risk_check": {"passed": false, "notes": "隐私 fail。"},
+  "passed": true
+}

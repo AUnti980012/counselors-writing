@@ -1,0 +1,304 @@
+{
+  "$defs": {
+    "DraftLineage": {
+      "additionalProperties": false,
+      "description": "写作内容血缘：每个主要事实性断言必须可追溯到以下引用之一。",
+      "properties": {
+        "topic_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Topic Id"
+        },
+        "analysis_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Analysis Id"
+        },
+        "mapping_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mapping Id"
+        },
+        "style_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Style Id"
+        },
+        "profile_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Id"
+        },
+        "case_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "source_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "title": "DraftLineage",
+      "type": "object"
+    },
+    "DraftSection": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Heading",
+          "type": "string"
+        },
+        "content": {
+          "maxLength": 5000,
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "title": "DraftSection",
+      "type": "object"
+    },
+    "FactClaim": {
+      "additionalProperties": false,
+      "description": "事实/推断统一载体。跨字段硬规则见 model_validator。",
+      "properties": {
+        "statement": {
+          "description": "陈述内容",
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "fact_type": {
+          "description": "documented_fact/source_claim 属事实；其余属 AI 产物",
+          "enum": [
+            "documented_fact",
+            "source_claim",
+            "ai_inference",
+            "derived_pattern",
+            "recommendation"
+          ],
+          "title": "Fact Type",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "description": "证据记录 id 列表（事实必填，≥1）",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "basis": {
+          "default": "",
+          "description": "推断依据说明（AI 产物必填）",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "statement",
+        "fact_type"
+      ],
+      "title": "FactClaim",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "正文草稿契约：白名单血缘（lineage）+ 逐条可追溯断言（claims）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "draft_id": {
+      "description": "推荐前缀 drf-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Draft Id",
+      "type": "string"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Task Id"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "subtitle": {
+      "default": "",
+      "maxLength": 200,
+      "title": "Subtitle",
+      "type": "string"
+    },
+    "sections": {
+      "description": "四段式：钩子/事件叙述/冲突展开/价值升华",
+      "items": {
+        "$ref": "#/$defs/DraftSection"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Sections",
+      "type": "array"
+    },
+    "closing": {
+      "default": "",
+      "description": "落款（文风/热点/阅读时长）",
+      "maxLength": 500,
+      "title": "Closing",
+      "type": "string"
+    },
+    "word_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Word Count",
+      "type": "integer"
+    },
+    "style_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Style Id"
+    },
+    "lineage": {
+      "$ref": "#/$defs/DraftLineage",
+      "default": {
+        "topic_id": null,
+        "analysis_id": null,
+        "mapping_id": null,
+        "style_id": null,
+        "profile_id": null,
+        "case_ids": [],
+        "source_ids": [],
+        "evidence_ids": []
+      }
+    },
+    "claims": {
+      "description": "主要事实性断言（逐条标注 fact_type + 证据）",
+      "items": {
+        "$ref": "#/$defs/FactClaim"
+      },
+      "maxItems": 100,
+      "title": "Claims",
+      "type": "array"
+    },
+    "status": {
+      "default": "draft",
+      "enum": [
+        "draft",
+        "reviewed",
+        "final"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "draft_id",
+    "title",
+    "sections"
+  ],
+  "title": "DraftRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

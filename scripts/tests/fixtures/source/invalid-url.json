@@ -1,0 +1,4 @@
+{
+  "source_id": "src-bad-url-1",
+  "url": "ftp://example.com/not-http"
+}

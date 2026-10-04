@@ -1,0 +1,1108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "common",
+  "description": "共享定义与枚举表；实体文件中的 #/$defs/Xxx 引用解析到本文件。",
+  "$defs": {
+    "RefPair": {
+      "additionalProperties": false,
+      "description": "通用引用：kind + ref_id，用于 task 的 input/output refs 等。",
+      "properties": {
+        "kind": {
+          "enum": [
+            "task",
+            "artifact",
+            "source",
+            "document",
+            "chunk",
+            "case",
+            "style",
+            "topic",
+            "analysis",
+            "mapping",
+            "profile",
+            "audit",
+            "effect",
+            "draft",
+            "evidence"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref_id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Ref Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref_id"
+      ],
+      "title": "RefPair",
+      "type": "object"
+    },
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "description": "轻量证据引用：直接指回 artifact/document/chunk + 有界摘录（禁止整文复制）。",
+      "properties": {
+        "kind": {
+          "enum": [
+            "artifact",
+            "source",
+            "document",
+            "chunk"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref_id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Ref Id",
+          "type": "string"
+        },
+        "excerpt": {
+          "default": "",
+          "description": "证据摘录（≤300 字符）",
+          "maxLength": 300,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref_id"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "FactClaim": {
+      "additionalProperties": false,
+      "description": "事实/推断统一载体。跨字段硬规则见 model_validator。",
+      "properties": {
+        "statement": {
+          "description": "陈述内容",
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "fact_type": {
+          "description": "documented_fact/source_claim 属事实；其余属 AI 产物",
+          "enum": [
+            "documented_fact",
+            "source_claim",
+            "ai_inference",
+            "derived_pattern",
+            "recommendation"
+          ],
+          "title": "Fact Type",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "description": "证据记录 id 列表（事实必填，≥1）",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "basis": {
+          "default": "",
+          "description": "推断依据说明（AI 产物必填）",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "statement",
+        "fact_type"
+      ],
+      "title": "FactClaim",
+      "type": "object"
+    },
+    "SourceBasis": {
+      "additionalProperties": false,
+      "description": "选题/分析的素材依据（只存引用与摘录，不存全文）。",
+      "properties": {
+        "source_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "case_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "material_excerpt": {
+          "default": "",
+          "description": "素材摘录（已脱敏，≤500 字符）",
+          "maxLength": 500,
+          "title": "Material Excerpt",
+          "type": "string"
+        }
+      },
+      "title": "SourceBasis",
+      "type": "object"
+    },
+    "RetryInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "default": 0,
+          "description": "已重试次数",
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "max_attempts": {
+          "default": 3,
+          "description": "最大重试次数（有限重试）",
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "last_error": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Last Error",
+          "type": "string"
+        }
+      },
+      "title": "RetryInfo",
+      "type": "object"
+    },
+    "ErrorInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "stage": {
+          "description": "失败发生时所在的流水线阶段",
+          "enum": [
+            "CREATED",
+            "ROUTING",
+            "ACCESSING",
+            "FETCHING",
+            "PROCESSING",
+            "EXTRACTING",
+            "VALIDATING",
+            "INDEXING",
+            "ANALYZING",
+            "MAPPING",
+            "GENERATING",
+            "REVIEWING",
+            "COMPLETED",
+            "FAILED",
+            "BLOCKED",
+            "CANCELLED"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "code": {
+          "description": "机器可读失败码",
+          "enum": [
+            "success",
+            "blocked",
+            "access_restricted",
+            "unavailable",
+            "timeout",
+            "rate_limited",
+            "parse_failed",
+            "extraction_failed",
+            "validation_failed",
+            "index_failed",
+            "dependency_failed",
+            "cancelled"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "code"
+      ],
+      "title": "ErrorInfo",
+      "type": "object"
+    },
+    "TopicAngle": {
+      "additionalProperties": false,
+      "description": "五角度框架的单角度评价（FEAT-10：成长/选择/责任/关系/家国情怀）。",
+      "properties": {
+        "name": {
+          "maxLength": 50,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "score": {
+          "description": "0-5 分",
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Score",
+          "type": "number"
+        },
+        "reasoning": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Reasoning",
+          "type": "string"
+        },
+        "core_conflict": {
+          "default": "",
+          "description": "核心冲突",
+          "maxLength": 500,
+          "title": "Core Conflict",
+          "type": "string"
+        },
+        "student_concerns": {
+          "description": "学生真正关心的点（≤3 条）",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "title": "Student Concerns",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "score"
+      ],
+      "title": "TopicAngle",
+      "type": "object"
+    },
+    "TopicTitle": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "description": "悬念式 / 反问式 / 故事式",
+          "enum": [
+            "suspense",
+            "question",
+            "story"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ],
+      "title": "TopicTitle",
+      "type": "object"
+    },
+    "DraftSection": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Heading",
+          "type": "string"
+        },
+        "content": {
+          "maxLength": 5000,
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "title": "DraftSection",
+      "type": "object"
+    },
+    "DraftLineage": {
+      "additionalProperties": false,
+      "description": "写作内容血缘：每个主要事实性断言必须可追溯到以下引用之一。",
+      "properties": {
+        "topic_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Topic Id"
+        },
+        "analysis_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Analysis Id"
+        },
+        "mapping_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mapping Id"
+        },
+        "style_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Style Id"
+        },
+        "profile_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Id"
+        },
+        "case_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "source_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "title": "DraftLineage",
+      "type": "object"
+    },
+    "ProfileProvenance": {
+      "additionalProperties": false,
+      "description": "画像字段级溯源：谁在什么时候基于什么证据写下这个字段。",
+      "properties": {
+        "field": {
+          "enum": [
+            "school_name",
+            "school_type",
+            "student_profile",
+            "common_topics",
+            "sensitive_points",
+            "title_style_preference"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "fact_type": {
+          "enum": [
+            "documented_fact",
+            "source_claim",
+            "ai_inference",
+            "derived_pattern",
+            "recommendation"
+          ],
+          "title": "Fact Type",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "basis": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "fact_type"
+      ],
+      "title": "ProfileProvenance",
+      "type": "object"
+    },
+    "ComparisonItem": {
+      "$defs": {
+        "FactClaim": {
+          "additionalProperties": false,
+          "description": "事实/推断统一载体。跨字段硬规则见 model_validator。",
+          "properties": {
+            "statement": {
+              "description": "陈述内容",
+              "maxLength": 1000,
+              "minLength": 1,
+              "title": "Statement",
+              "type": "string"
+            },
+            "fact_type": {
+              "description": "documented_fact/source_claim 属事实；其余属 AI 产物",
+              "enum": [
+                "documented_fact",
+                "source_claim",
+                "ai_inference",
+                "derived_pattern",
+                "recommendation"
+              ],
+              "title": "Fact Type",
+              "type": "string"
+            },
+            "evidence_ids": {
+              "description": "证据记录 id 列表（事实必填，≥1）",
+              "items": {
+                "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+                "type": "string"
+              },
+              "maxItems": 20,
+              "title": "Evidence Ids",
+              "type": "array"
+            },
+            "basis": {
+              "default": "",
+              "description": "推断依据说明（AI 产物必填）",
+              "maxLength": 1000,
+              "title": "Basis",
+              "type": "string"
+            }
+          },
+          "required": [
+            "statement",
+            "fact_type"
+          ],
+          "title": "FactClaim",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "description": "对比维度（problem/target/mechanism/…）",
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Dimension",
+          "type": "string"
+        },
+        "case_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "finding": {
+          "$ref": "#/$defs/FactClaim"
+        }
+      },
+      "required": [
+        "dimension",
+        "finding"
+      ],
+      "title": "ComparisonItem",
+      "type": "object"
+    },
+    "MethodItem": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Method",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "basis": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "MethodItem",
+      "type": "object"
+    },
+    "RiskItem": {
+      "additionalProperties": false,
+      "properties": {
+        "risk": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Risk",
+          "type": "string"
+        },
+        "level": {
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "risk"
+      ],
+      "title": "RiskItem",
+      "type": "object"
+    },
+    "RecommendationItem": {
+      "additionalProperties": false,
+      "properties": {
+        "recommendation": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Recommendation",
+          "type": "string"
+        },
+        "basis": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "recommendation"
+      ],
+      "title": "RecommendationItem",
+      "type": "object"
+    },
+    "AuditIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "check": {
+          "description": "七项自查（political/factual/value/labeling/ai_trace/privacy/copyright）+ 标点/格式",
+          "enum": [
+            "political",
+            "factual",
+            "value",
+            "labeling",
+            "ai_trace",
+            "privacy",
+            "copyright",
+            "punctuation",
+            "format"
+          ],
+          "title": "Check",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "warn",
+            "fail"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        },
+        "location": {
+          "default": "",
+          "description": "问题定位（段落/句子引用）",
+          "maxLength": 200,
+          "title": "Location",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "check",
+        "verdict"
+      ],
+      "title": "AuditIssue",
+      "type": "object"
+    },
+    "CheckGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "passed": {
+          "default": true,
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "notes": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Notes",
+          "type": "string"
+        }
+      },
+      "title": "CheckGroup",
+      "type": "object"
+    },
+    "EffectDimension": {
+      "additionalProperties": false,
+      "properties": {
+        "score": {
+          "anyOf": [
+            {
+              "maximum": 5,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "title": "EffectDimension",
+      "type": "object"
+    },
+    "ModelMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "default": "",
+          "maxLength": 100,
+          "title": "Model",
+          "type": "string"
+        },
+        "mode": {
+          "default": "economy",
+          "enum": [
+            "economy",
+            "standard",
+            "deep"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Temperature"
+        }
+      },
+      "title": "ModelMetadata",
+      "type": "object"
+    },
+    "DocSection": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Heading",
+          "type": "string"
+        },
+        "level": {
+          "default": 1,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        },
+        "char_start": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Char Start",
+          "type": "integer"
+        },
+        "char_end": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Char End",
+          "type": "integer"
+        }
+      },
+      "title": "DocSection",
+      "type": "object"
+    },
+    "MatchingPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "point": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Point",
+          "type": "string"
+        },
+        "case_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "profile_field": {
+          "default": "",
+          "maxLength": 50,
+          "title": "Profile Field",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "point"
+      ],
+      "title": "MatchingPoint",
+      "type": "object"
+    },
+    "DifferenceItem": {
+      "additionalProperties": false,
+      "properties": {
+        "difference": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Difference",
+          "type": "string"
+        },
+        "case_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "profile_field": {
+          "default": "",
+          "maxLength": 50,
+          "title": "Profile Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "difference"
+      ],
+      "title": "DifferenceItem",
+      "type": "object"
+    }
+  },
+  "enums": {
+    "task_status": [
+      "CREATED",
+      "ROUTING",
+      "ACCESSING",
+      "FETCHING",
+      "PROCESSING",
+      "EXTRACTING",
+      "VALIDATING",
+      "INDEXING",
+      "ANALYZING",
+      "MAPPING",
+      "GENERATING",
+      "REVIEWING",
+      "COMPLETED",
+      "FAILED",
+      "BLOCKED",
+      "CANCELLED"
+    ],
+    "task_type": [
+      "research",
+      "writing",
+      "review",
+      "retro",
+      "extraction",
+      "import",
+      "maintenance",
+      "generic"
+    ],
+    "failure_code": [
+      "success",
+      "blocked",
+      "access_restricted",
+      "unavailable",
+      "timeout",
+      "rate_limited",
+      "parse_failed",
+      "extraction_failed",
+      "validation_failed",
+      "index_failed",
+      "dependency_failed",
+      "cancelled"
+    ],
+    "fact_type": [
+      "documented_fact",
+      "source_claim",
+      "ai_inference",
+      "derived_pattern",
+      "recommendation"
+    ],
+    "artifact_status": [
+      "created",
+      "valid",
+      "invalid",
+      "failed",
+      "expired"
+    ],
+    "retention": [
+      "temporary",
+      "permanent",
+      "task_bound"
+    ],
+    "language": [
+      "zh",
+      "en",
+      "ja",
+      "auto",
+      "unknown"
+    ],
+    "retrieval_method": [
+      "api",
+      "http",
+      "browser",
+      "user_provided",
+      "sibling_skill",
+      "unknown"
+    ],
+    "source_status": [
+      "success",
+      "blocked",
+      "access_restricted",
+      "unavailable",
+      "timeout",
+      "rate_limited",
+      "parse_failed"
+    ],
+    "evidence_kind": [
+      "quote",
+      "paraphrase",
+      "data_point",
+      "link",
+      "screenshot_desc"
+    ],
+    "extractor_kind": [
+      "case_facts",
+      "style_pattern",
+      "topic_signal",
+      "hot_interface",
+      "media_style"
+    ],
+    "extraction_status": [
+      "success",
+      "extraction_failed",
+      "validation_failed",
+      "cancelled"
+    ],
+    "model_mode": [
+      "economy",
+      "standard",
+      "deep"
+    ],
+    "verdict": [
+      "pass",
+      "warn",
+      "fail"
+    ],
+    "risk_level": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "draft_status": [
+      "draft",
+      "reviewed",
+      "final"
+    ],
+    "topic_status": [
+      "draft",
+      "confirmed",
+      "used",
+      "abandoned"
+    ],
+    "school_type": [
+      "university",
+      "college",
+      "vocational",
+      "high_school",
+      "other"
+    ],
+    "style_origin": [
+      "seed",
+      "user"
+    ],
+    "audit_check": [
+      "political",
+      "factual",
+      "value",
+      "labeling",
+      "ai_trace",
+      "privacy",
+      "copyright",
+      "punctuation",
+      "format"
+    ],
+    "title_type": [
+      "suspense",
+      "question",
+      "story"
+    ],
+    "ref_kind": [
+      "task",
+      "artifact",
+      "source",
+      "document",
+      "chunk",
+      "case",
+      "style",
+      "topic",
+      "analysis",
+      "mapping",
+      "profile",
+      "audit",
+      "effect",
+      "draft",
+      "evidence"
+    ]
+  }
+}

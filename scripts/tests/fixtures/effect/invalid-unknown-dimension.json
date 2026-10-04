@@ -1,0 +1,8 @@
+{
+  "effect_id": "eff-bad-dim-001",
+  "case_id": "case-demo-0001",
+  "dimensions": {
+    "title": {"score": 4, "note": ""},
+    "unknown_dimension": {"score": 3, "note": "白名单之外的维度"}
+  }
+}

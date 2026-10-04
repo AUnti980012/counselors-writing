@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "pro-demo-0001",
+  "school_name": "示例大学",
+  "school_type": "university",
+  "student_profile": "学生普遍对公开表达有顾虑，但对匿名渠道参与度高（示例画像）。",
+  "common_topics": ["就业焦虑", "目标感缺失"],
+  "sensitive_points": ["个别学生家庭经济困难，相关内容一律脱敏"],
+  "title_style_preference": "偏好故事式标题，反感标题党。",
+  "provenance": [
+    {
+      "field": "student_profile",
+      "fact_type": "source_claim",
+      "evidence_ids": ["evd-demo-0001"],
+      "basis": "",
+      "note": "来自辅导员反馈"
+    }
+  ],
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "draft_id": "drf-demo-0001",
+  "task_id": "task-demo-0001",
+  "title": "十年后的你，会感谢今天的这封信吗？",
+  "subtitle": "",
+  "sections": [
+    {"heading": "钩子", "content": "班会现场，匿名箱打开的那一刻，教室里安静得能听见呼吸。"},
+    {"heading": "事件叙述", "content": "一周前布置的「十年后的自己」信件，在班会上被随机朗读。"},
+    {"heading": "冲突展开", "content": "有人笑，有人低头。写下的理想和现实的差距，正是这场班会要面对的东西。"},
+    {"heading": "价值升华", "content": "十年后的你，也是十年后的中国。"}
+  ],
+  "closing": "文风：青年系；预计阅读时长 3 分钟。",
+  "word_count": 320,
+  "style_id": "style-seed-zqb",
+  "lineage": {
+    "topic_id": "top-demo-0001",
+    "analysis_id": "ana-demo-0001",
+    "mapping_id": "map-demo-0001",
+    "style_id": "style-seed-zqb",
+    "profile_id": "pro-demo-0001",
+    "case_ids": ["case-demo-0001"],
+    "source_ids": ["src-demo-0001"],
+    "evidence_ids": ["evd-demo-0001"]
+  },
+  "claims": [
+    {
+      "statement": "班会采用匿名收集、随机朗读的形式。",
+      "fact_type": "documented_fact",
+      "evidence_ids": ["evd-demo-0001"]
+    }
+  ],
+  "status": "draft",
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

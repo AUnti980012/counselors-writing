@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "task_id": "task-edge-0001",
+  "task_type": "writing",
+  "status": "REVIEWING",
+  "progress": 100,
+  "created_at": "2026-09-30T08:00:00+08:00",
+  "updated_at": "2026-09-30T09:00:00+08:00",
+  "input_refs": [
+    {"kind": "topic", "ref_id": "top-edge-0001"},
+    {"kind": "analysis", "ref_id": "ana-edge-0001"}
+  ],
+  "output_refs": [{"kind": "draft", "ref_id": "drf-edge-0001"}],
+  "retry": {"attempt": 2, "max_attempts": 5, "last_error": "第一次网络超时，第二次命中缓存"},
+  "error": null,
+  "context_refs": {
+    "case": ["case-edge-0001", "case-edge-0002"],
+    "artifact": ["raw-20260930-aaaaaaaa"]
+  },
+  "parent_task_id": null,
+  "resumable": true
+}

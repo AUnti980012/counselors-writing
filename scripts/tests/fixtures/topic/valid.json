@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "topic_id": "top-demo-0001",
+  "title": "「十年后的自己」班会之后",
+  "summary": "一场班会让学生写下十年后的自己（素材已脱敏）。",
+  "source_basis": {
+    "source_ids": ["src-demo-0001"],
+    "case_ids": ["case-demo-0001"],
+    "material_excerpt": "班会匿名朗读环节的真实反应。"
+  },
+  "evidence_basis": ["evd-demo-0001"],
+  "relevance": "目标感缺失是当前学生群体的普遍困惑。",
+  "novelty": "用匿名机制降低表达门槛，角度较新。",
+  "applicability": "可迁移到开学第一课、职业规划月等活动。",
+  "expected_audience": "大一至大三学生，对职业规划迷茫者。",
+  "risks": "涉及学生个人理想，需脱敏处理。",
+  "generation_status": "draft",
+  "angles": [
+    {
+      "name": "成长",
+      "score": 4.5,
+      "reasoning": "十年视角天然带有成长叙事。",
+      "core_conflict": "当下的迷茫与十年后的确定性。",
+      "student_concerns": ["我现在选的路对吗？", "十年后我会在哪？"],
+      "evidence_ids": ["evd-demo-0001"]
+    },
+    {
+      "name": "选择",
+      "score": 3.0,
+      "reasoning": "选择是成长的下位角度，可作补充。",
+      "core_conflict": "",
+      "student_concerns": ["选错专业怎么办？"],
+      "evidence_ids": []
+    }
+  ],
+  "titles": [
+    {"type": "suspense", "text": "十年后的你，会感谢今天的这封信吗？", "note": ""},
+    {"type": "question", "text": "写给十年后的自己：你现在在哪？", "note": ""},
+    {"type": "story", "text": "那个在班会上读信的学生，后来……", "note": ""}
+  ],
+  "hook": "班会现场，匿名箱打开的那一刻。",
+  "value_landing": "十年后的你，也是十年后的中国。",
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

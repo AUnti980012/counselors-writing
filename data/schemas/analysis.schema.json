@@ -1,0 +1,302 @@
+{
+  "$defs": {
+    "ComparisonItem": {
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "description": "对比维度（problem/target/mechanism/…）",
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Dimension",
+          "type": "string"
+        },
+        "case_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "finding": {
+          "$ref": "#/$defs/FactClaim"
+        }
+      },
+      "required": [
+        "dimension",
+        "finding"
+      ],
+      "title": "ComparisonItem",
+      "type": "object"
+    },
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "description": "轻量证据引用：直接指回 artifact/document/chunk + 有界摘录（禁止整文复制）。",
+      "properties": {
+        "kind": {
+          "enum": [
+            "artifact",
+            "source",
+            "document",
+            "chunk"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref_id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Ref Id",
+          "type": "string"
+        },
+        "excerpt": {
+          "default": "",
+          "description": "证据摘录（≤300 字符）",
+          "maxLength": 300,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref_id"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "FactClaim": {
+      "additionalProperties": false,
+      "description": "事实/推断统一载体。跨字段硬规则见 model_validator。",
+      "properties": {
+        "statement": {
+          "description": "陈述内容",
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "fact_type": {
+          "description": "documented_fact/source_claim 属事实；其余属 AI 产物",
+          "enum": [
+            "documented_fact",
+            "source_claim",
+            "ai_inference",
+            "derived_pattern",
+            "recommendation"
+          ],
+          "title": "Fact Type",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "description": "证据记录 id 列表（事实必填，≥1）",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "basis": {
+          "default": "",
+          "description": "推断依据说明（AI 产物必填）",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "statement",
+        "fact_type"
+      ],
+      "title": "FactClaim",
+      "type": "object"
+    },
+    "MethodItem": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Method",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "basis": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "MethodItem",
+      "type": "object"
+    },
+    "RecommendationItem": {
+      "additionalProperties": false,
+      "properties": {
+        "recommendation": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Recommendation",
+          "type": "string"
+        },
+        "basis": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "recommendation"
+      ],
+      "title": "RecommendationItem",
+      "type": "object"
+    },
+    "RiskItem": {
+      "additionalProperties": false,
+      "properties": {
+        "risk": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Risk",
+          "type": "string"
+        },
+        "level": {
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "risk"
+      ],
+      "title": "RiskItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "案例分析契约：与 Case 分离；描述性事实与分析结论强制区分（fact_type 逐条标注）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "analysis_id": {
+      "description": "推荐前缀 ana-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Analysis Id",
+      "type": "string"
+    },
+    "input_case_ids": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+        "type": "string"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Input Case Ids",
+      "type": "array"
+    },
+    "topic": {
+      "default": "",
+      "maxLength": 200,
+      "title": "Topic",
+      "type": "string"
+    },
+    "patterns": {
+      "description": "规律发现（逐条标注 fact_type）",
+      "items": {
+        "$ref": "#/$defs/FactClaim"
+      },
+      "maxItems": 20,
+      "title": "Patterns",
+      "type": "array"
+    },
+    "comparisons": {
+      "items": {
+        "$ref": "#/$defs/ComparisonItem"
+      },
+      "maxItems": 20,
+      "title": "Comparisons",
+      "type": "array"
+    },
+    "transferable_methods": {
+      "items": {
+        "$ref": "#/$defs/MethodItem"
+      },
+      "maxItems": 20,
+      "title": "Transferable Methods",
+      "type": "array"
+    },
+    "risks": {
+      "items": {
+        "$ref": "#/$defs/RiskItem"
+      },
+      "maxItems": 20,
+      "title": "Risks",
+      "type": "array"
+    },
+    "recommendations": {
+      "items": {
+        "$ref": "#/$defs/RecommendationItem"
+      },
+      "maxItems": 20,
+      "title": "Recommendations",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/EvidenceRef"
+      },
+      "maxItems": 50,
+      "title": "Evidence",
+      "type": "array"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "input_case_ids"
+  ],
+  "title": "AnalysisRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

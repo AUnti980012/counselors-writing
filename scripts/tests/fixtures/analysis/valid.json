@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "analysis_id": "ana-demo-0001",
+  "input_case_ids": ["case-demo-0001"],
+  "topic": "匿名机制在班级活动中的应用",
+  "patterns": [
+    {
+      "statement": "匿名化设计能降低学生公开表达的顾虑。",
+      "fact_type": "ai_inference",
+      "basis": "案例中匿名朗读与参与度的对应关系，未经对照实验验证。",
+      "evidence_ids": []
+    }
+  ],
+  "comparisons": [
+    {
+      "dimension": "mechanism",
+      "case_ids": ["case-demo-0001"],
+      "finding": {
+        "statement": "本案例用匿名箱实现参与保护。",
+        "fact_type": "documented_fact",
+        "evidence_ids": ["evd-demo-0001"]
+      }
+    }
+  ],
+  "transferable_methods": [
+    {"method": "匿名收集 + 随机朗读 + 教师示范的三步参与设计", "evidence_ids": ["evd-demo-0001"], "basis": ""}
+  ],
+  "risks": [
+    {"risk": "匿名内容若涉及隐私仍需二次脱敏", "level": "medium"}
+  ],
+  "recommendations": [
+    {"recommendation": "可迁移到职业规划月活动", "basis": "机制与场景的相似性"}
+  ],
+  "evidence": [
+    {"kind": "document", "ref_id": "doc-demo-0001", "excerpt": "匿名箱机制描述。", "note": ""}
+  ],
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

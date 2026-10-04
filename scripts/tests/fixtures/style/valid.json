@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "style-demo-0001",
+  "origin": "user",
+  "source_ids": [],
+  "structure": "故事化结构：白描开头 → 冲突展开 → 金句收尾。",
+  "tone": "亲切、口语化。",
+  "sentence_features": ["短句为主", "对话还原"],
+  "paragraph_features": ["段落短，一段一个场景"],
+  "title_patterns": ["事件反问式"],
+  "opening_patterns": ["真实对话切入"],
+  "ending_patterns": ["金句收尾，不喊口号"],
+  "narrative_patterns": ["第三人称白描"],
+  "communication_features": ["金句可截图传播"],
+  "exemplar_refs": [],
+  "exemplar_notes": "",
+  "content_hash": null,
+  "usage_count": 3,
+  "tags": ["成长", "对话体"],
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

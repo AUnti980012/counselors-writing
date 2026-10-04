@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "raw-20260930-a1b2c3d4",
+  "artifact_type": "raw_html",
+  "status": "valid",
+  "path": "cache/raw/2026/09/30/src-demo-0001.html",
+  "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created_at": "2026-09-30T09:00:00+08:00",
+  "updated_at": "2026-09-30T09:00:00+08:00",
+  "source_ids": ["src-demo-0001"],
+  "parent_ids": [],
+  "retention": "temporary",
+  "expires_at": null,
+  "summary": "示例 raw 页面（仅供测试）",
+  "metadata": {"bytes": "10240"}
+}

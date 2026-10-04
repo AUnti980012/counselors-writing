@@ -1,0 +1,10 @@
+{
+  "chunk_id": "chk-bad-seq-1",
+  "document_id": "doc-demo-0001",
+  "source_id": "src-demo-0001",
+  "sequence": -1,
+  "text": "序列号不能为负。",
+  "estimated_tokens": 6,
+  "char_start": 0,
+  "char_end": 9
+}

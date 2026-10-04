@@ -1,0 +1,12 @@
+{
+  "case_id": "case-bad-inf-001",
+  "title": "推断缺依据的案例",
+  "background": "素材已脱敏。",
+  "ai_inferences": [
+    {
+      "statement": "这是一条没有依据说明的推断。",
+      "fact_type": "ai_inference",
+      "basis": ""
+    }
+  ]
+}

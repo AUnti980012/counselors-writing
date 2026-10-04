@@ -1,0 +1,9 @@
+{
+  "extraction_id": "ext-bad-att-001",
+  "extractor": "case_facts",
+  "input_refs": {"document_ids": ["doc-demo-0001"]},
+  "output_refs": {},
+  "status": "extraction_failed",
+  "attempts": 4,
+  "validation_errors": []
+}

@@ -1,0 +1,5 @@
+{
+  "profile_id": "pro-bad-key-01",
+  "school_name": "示例大学",
+  "unknown_key": "白名单之外的键必须被拒绝"
+}

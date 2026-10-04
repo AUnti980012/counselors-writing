@@ -1,0 +1,286 @@
+{
+  "$defs": {
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "description": "轻量证据引用：直接指回 artifact/document/chunk + 有界摘录（禁止整文复制）。",
+      "properties": {
+        "kind": {
+          "enum": [
+            "artifact",
+            "source",
+            "document",
+            "chunk"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref_id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Ref Id",
+          "type": "string"
+        },
+        "excerpt": {
+          "default": "",
+          "description": "证据摘录（≤300 字符）",
+          "maxLength": 300,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref_id"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "FactClaim": {
+      "additionalProperties": false,
+      "description": "事实/推断统一载体。跨字段硬规则见 model_validator。",
+      "properties": {
+        "statement": {
+          "description": "陈述内容",
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "fact_type": {
+          "description": "documented_fact/source_claim 属事实；其余属 AI 产物",
+          "enum": [
+            "documented_fact",
+            "source_claim",
+            "ai_inference",
+            "derived_pattern",
+            "recommendation"
+          ],
+          "title": "Fact Type",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "description": "证据记录 id 列表（事实必填，≥1）",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "basis": {
+          "default": "",
+          "description": "推断依据说明（AI 产物必填）",
+          "maxLength": 1000,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "statement",
+        "fact_type"
+      ],
+      "title": "FactClaim",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "案例知识契约（辅导员工作案例）。\n\n红线：不混装传播效果/反馈/复盘字段（→ EffectRecord）；\n事实与推断强制分离（documented_facts / source_claims vs ai_inferences）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "case_id": {
+      "description": "推荐前缀 case-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Case Id",
+      "type": "string"
+    },
+    "source_ids": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+        "type": "string"
+      },
+      "maxItems": 50,
+      "title": "Source Ids",
+      "type": "array"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "background": {
+      "description": "背景（已脱敏的素材陈述）",
+      "maxLength": 5000,
+      "minLength": 1,
+      "title": "Background",
+      "type": "string"
+    },
+    "problem": {
+      "default": "",
+      "description": "要解决的问题",
+      "maxLength": 2000,
+      "title": "Problem",
+      "type": "string"
+    },
+    "actors": {
+      "description": "参与者（≤50 个，单个 ≤200 字符）",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 50,
+      "title": "Actors",
+      "type": "array"
+    },
+    "events": {
+      "description": "关键事件（≤100 个，单个 ≤1000 字符）",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Events",
+      "type": "array"
+    },
+    "methods": {
+      "default": "",
+      "description": "采用的方法/做法",
+      "maxLength": 5000,
+      "title": "Methods",
+      "type": "string"
+    },
+    "technology": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Technology",
+      "type": "string"
+    },
+    "data": {
+      "default": "",
+      "description": "相关数据（仅真实数据，禁编造）",
+      "maxLength": 2000,
+      "title": "Data",
+      "type": "string"
+    },
+    "process": {
+      "default": "",
+      "maxLength": 3000,
+      "title": "Process",
+      "type": "string"
+    },
+    "management": {
+      "default": "",
+      "description": "管理机制",
+      "maxLength": 3000,
+      "title": "Management",
+      "type": "string"
+    },
+    "values": {
+      "default": "",
+      "description": "价值内涵",
+      "maxLength": 2000,
+      "title": "Values",
+      "type": "string"
+    },
+    "innovation": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Innovation",
+      "type": "string"
+    },
+    "results": {
+      "default": "",
+      "description": "结果/效果（仅陈述，不展开复盘）",
+      "maxLength": 3000,
+      "title": "Results",
+      "type": "string"
+    },
+    "transferable_patterns": {
+      "description": "可迁移模式（≤20 条，单条 ≤1000 字符）",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Transferable Patterns",
+      "type": "array"
+    },
+    "writing_features": {
+      "default": "",
+      "description": "写作特征（hook/structure/升华落点）",
+      "maxLength": 3000,
+      "title": "Writing Features",
+      "type": "string"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/EvidenceRef"
+      },
+      "maxItems": 100,
+      "title": "Evidence",
+      "type": "array"
+    },
+    "documented_facts": {
+      "items": {
+        "$ref": "#/$defs/FactClaim"
+      },
+      "maxItems": 50,
+      "title": "Documented Facts",
+      "type": "array"
+    },
+    "source_claims": {
+      "items": {
+        "$ref": "#/$defs/FactClaim"
+      },
+      "maxItems": 50,
+      "title": "Source Claims",
+      "type": "array"
+    },
+    "ai_inferences": {
+      "items": {
+        "$ref": "#/$defs/FactClaim"
+      },
+      "maxItems": 50,
+      "title": "Ai Inferences",
+      "type": "array"
+    },
+    "tags": {
+      "description": "检索标签（单条 ≤50 字符；M5 检索元数据过滤用）",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 10,
+      "title": "Tags",
+      "type": "array"
+    }
+  },
+  "required": [
+    "case_id",
+    "title",
+    "background"
+  ],
+  "title": "CaseRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

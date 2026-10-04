@@ -1,0 +1,234 @@
+{
+  "$defs": {
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "description": "轻量证据引用：直接指回 artifact/document/chunk + 有界摘录（禁止整文复制）。",
+      "properties": {
+        "kind": {
+          "enum": [
+            "artifact",
+            "source",
+            "document",
+            "chunk"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref_id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Ref Id",
+          "type": "string"
+        },
+        "excerpt": {
+          "default": "",
+          "description": "证据摘录（≤300 字符）",
+          "maxLength": 300,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref_id"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "StyleRecord": {
+      "additionalProperties": false,
+      "description": "风格知识契约：只描述写作/传播特征，不存储整篇文章。",
+      "properties": {
+        "schema_version": {
+          "default": "1.0.0",
+          "description": "契约版本；变更契约时按语义化版本递增",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "created_at": {
+          "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "description": "更新时间（Python 托管；若显式给出必须带时区）",
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "style_id": {
+          "description": "推荐前缀 style-",
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Style Id",
+          "type": "string"
+        },
+        "origin": {
+          "default": "user",
+          "enum": [
+            "seed",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "structure": {
+          "default": "",
+          "maxLength": 3000,
+          "title": "Structure",
+          "type": "string"
+        },
+        "tone": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Tone",
+          "type": "string"
+        },
+        "sentence_features": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Sentence Features",
+          "type": "array"
+        },
+        "paragraph_features": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Paragraph Features",
+          "type": "array"
+        },
+        "title_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Title Patterns",
+          "type": "array"
+        },
+        "opening_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Opening Patterns",
+          "type": "array"
+        },
+        "ending_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Ending Patterns",
+          "type": "array"
+        },
+        "narrative_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Narrative Patterns",
+          "type": "array"
+        },
+        "communication_features": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Communication Features",
+          "type": "array"
+        },
+        "exemplar_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "maxItems": 10,
+          "title": "Exemplar Refs",
+          "type": "array"
+        },
+        "exemplar_notes": {
+          "default": "",
+          "description": "种子条目出处备注（媒体/文章名/日期/引文；待 M3 建 source 后迁移为正式引用）",
+          "maxLength": 2000,
+          "title": "Exemplar Notes",
+          "type": "string"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Hash"
+        },
+        "usage_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Usage Count",
+          "type": "integer"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "style_id"
+      ],
+      "title": "StyleRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "data/knowledge/styles/seed.json 的文件信封（种子随交付固化，origin 一律 seed）。\n\n导出为独立文件 data/schemas/seed.schema.json：其 entries 项的 StyleRecord\n定义内联进该文件自己的 $defs（StyleRecord 是实体模型，不在 common 共享区），\n避免 common.json 出现指向实体模型的悬空引用。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/StyleRecord"
+      },
+      "maxItems": 100,
+      "minItems": 1,
+      "title": "Entries",
+      "type": "array"
+    }
+  },
+  "required": [
+    "entries"
+  ],
+  "title": "StyleSeedEnvelope",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

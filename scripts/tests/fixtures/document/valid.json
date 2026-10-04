@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "document_id": "doc-demo-0001",
+  "source_id": "src-demo-0001",
+  "content_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "language": "zh",
+  "word_count": 1800,
+  "created_at": "2026-09-30T09:20:00+08:00",
+  "updated_at": "2026-09-30T09:20:00+08:00",
+  "sections": [
+    {"heading": "引言", "level": 1, "char_start": 0, "char_end": 120},
+    {"heading": "一个辅导员的日常", "level": 2, "char_start": 121, "char_end": 900}
+  ],
+  "chunk_ids": ["chk-demo-0001", "chk-demo-0002"],
+  "processing": {"extractor": "preprocess-main-text", "cleaned": "true"}
+}

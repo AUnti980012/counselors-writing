@@ -1,0 +1,91 @@
+{
+  "additionalProperties": false,
+  "description": "分块契约：≤2000 字符内联 + 位置信息（M3 落盘，M2 建索引）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "chunk_id": {
+      "description": "推荐前缀 chk-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Chunk Id",
+      "type": "string"
+    },
+    "document_id": {
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "source_id": {
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "sequence": {
+      "description": "文档内顺序号（从 0 起）",
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "heading": {
+      "default": "",
+      "description": "所属标题（段落/标题边界切块）",
+      "maxLength": 200,
+      "title": "Heading",
+      "type": "string"
+    },
+    "text": {
+      "description": "块文本（硬上限 2000 字符）",
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    },
+    "estimated_tokens": {
+      "default": 1,
+      "description": "估算：字符数/1.6",
+      "maximum": 4000,
+      "minimum": 1,
+      "title": "Estimated Tokens",
+      "type": "integer"
+    },
+    "char_start": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Char Start",
+      "type": "integer"
+    },
+    "char_end": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Char End",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "chunk_id",
+    "document_id",
+    "source_id",
+    "sequence",
+    "text"
+  ],
+  "title": "ChunkRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

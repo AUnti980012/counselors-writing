@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "case-demo-0001",
+  "source_ids": ["src-demo-0001"],
+  "title": "一场关于「十年后的自己」的主题班会",
+  "background": "辅导员组织了一场主题班会，让学生写下十年后的自己并当众分享（素材已脱敏）。",
+  "problem": "学生普遍缺乏长期目标感，班会参与度低。",
+  "actors": ["辅导员", "全班学生"],
+  "events": [
+    "班会前一周布置「十年后的自己」一封信",
+    "班会现场随机抽取并朗读",
+    "辅导员最后分享自己的十年故事"
+  ],
+  "methods": "具象化未来想象 + 师生共同叙事 + 匿名朗读降低羞耻感。",
+  "technology": "",
+  "data": "全班 32 人，31 人完成写信（数据为示例，仅测试用）。",
+  "process": "布置任务 → 匿名收集 → 班会朗读 → 教师示范 → 收尾升华。",
+  "management": "用班级匿名箱机制保护隐私。",
+  "values": "把个人成长目标与国家发展需要相连接。",
+  "innovation": "用「匿名朗读」化解当众表达的顾虑。",
+  "results": "班会后主动找辅导员聊规划的学生明显增多（示例结果）。",
+  "transferable_patterns": [
+    "先具象化、再匿名化、最后示范化的三步参与设计"
+  ],
+  "writing_features": "开头用现场朗读的真实片段切入，结尾落到「十年后的你，也是十年后的中国」。",
+  "evidence": [
+    {"kind": "document", "ref_id": "doc-demo-0001", "excerpt": "匿名箱机制的描述段落。", "note": "来自素材原文"}
+  ],
+  "documented_facts": [
+    {
+      "statement": "班会采用匿名收集、随机朗读的形式。",
+      "fact_type": "documented_fact",
+      "evidence_ids": ["evd-demo-0001"]
+    },
+    {
+      "statement": "全班 32 人中 31 人完成写信。",
+      "fact_type": "documented_fact",
+      "evidence_ids": ["evd-demo-0002"]
+    }
+  ],
+  "source_claims": [
+    {
+      "statement": "素材提供者称班会后咨询规划的学生增多。",
+      "fact_type": "source_claim",
+      "evidence_ids": ["evd-demo-0003"]
+    }
+  ],
+  "ai_inferences": [
+    {
+      "statement": "匿名化设计是参与度提升的关键因素之一。",
+      "fact_type": "ai_inference",
+      "basis": "基于低参与度问题与匿名机制的对应关系推断，未经对照验证。",
+      "evidence_ids": []
+    }
+  ],
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

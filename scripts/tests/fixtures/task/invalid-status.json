@@ -1,0 +1,5 @@
+{
+  "task_id": "task-bad-status",
+  "task_type": "generic",
+  "status": "FLYING"
+}

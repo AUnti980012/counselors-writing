@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# 运行时数据（可经 `python scripts/kb.py db init` 从零重建/自初始化）
+cache/
+data/index.db
+data/index.db-*
+data/case_library/
+data/profiles/
+data/style_library/
+data/backups/
+
+# 系统
+.DS_Store
+Thumbs.db

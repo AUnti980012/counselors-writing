@@ -1,0 +1,8 @@
+{
+  "document_id": "doc-bad-range-1",
+  "source_id": "src-demo-0001",
+  "content_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "sections": [
+    {"heading": "区间非法", "level": 1, "char_start": 500, "char_end": 100}
+  ]
+}

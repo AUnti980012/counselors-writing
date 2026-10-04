@@ -1,0 +1,267 @@
+{
+  "$defs": {
+    "SourceBasis": {
+      "additionalProperties": false,
+      "description": "选题/分析的素材依据（只存引用与摘录，不存全文）。",
+      "properties": {
+        "source_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "case_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "material_excerpt": {
+          "default": "",
+          "description": "素材摘录（已脱敏，≤500 字符）",
+          "maxLength": 500,
+          "title": "Material Excerpt",
+          "type": "string"
+        }
+      },
+      "title": "SourceBasis",
+      "type": "object"
+    },
+    "TopicAngle": {
+      "additionalProperties": false,
+      "description": "五角度框架的单角度评价（FEAT-10：成长/选择/责任/关系/家国情怀）。",
+      "properties": {
+        "name": {
+          "maxLength": 50,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "score": {
+          "description": "0-5 分",
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Score",
+          "type": "number"
+        },
+        "reasoning": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Reasoning",
+          "type": "string"
+        },
+        "core_conflict": {
+          "default": "",
+          "description": "核心冲突",
+          "maxLength": 500,
+          "title": "Core Conflict",
+          "type": "string"
+        },
+        "student_concerns": {
+          "description": "学生真正关心的点（≤3 条）",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "title": "Student Concerns",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "score"
+      ],
+      "title": "TopicAngle",
+      "type": "object"
+    },
+    "TopicTitle": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "description": "悬念式 / 反问式 / 故事式",
+          "enum": [
+            "suspense",
+            "question",
+            "story"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ],
+      "title": "TopicTitle",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "选题卡契约（对齐五角度框架与选题卡模板，修复 V1 字段 drift）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "topic_id": {
+      "description": "推荐前缀 top-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Topic Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "summary": {
+      "default": "",
+      "description": "素材一句话（已脱敏）",
+      "maxLength": 500,
+      "title": "Summary",
+      "type": "string"
+    },
+    "source_basis": {
+      "$ref": "#/$defs/SourceBasis",
+      "default": {
+        "source_ids": [],
+        "case_ids": [],
+        "material_excerpt": ""
+      }
+    },
+    "evidence_basis": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Evidence Basis",
+      "type": "array"
+    },
+    "relevance": {
+      "default": "",
+      "description": "与学生群体的相关性",
+      "maxLength": 1000,
+      "title": "Relevance",
+      "type": "string"
+    },
+    "novelty": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Novelty",
+      "type": "string"
+    },
+    "applicability": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Applicability",
+      "type": "string"
+    },
+    "expected_audience": {
+      "default": "",
+      "description": "读者画像",
+      "maxLength": 500,
+      "title": "Expected Audience",
+      "type": "string"
+    },
+    "risks": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Risks",
+      "type": "string"
+    },
+    "generation_status": {
+      "default": "draft",
+      "enum": [
+        "draft",
+        "confirmed",
+        "used",
+        "abandoned"
+      ],
+      "title": "Generation Status",
+      "type": "string"
+    },
+    "angles": {
+      "description": "五角度评价（成长/选择/责任/关系/家国情怀）",
+      "items": {
+        "$ref": "#/$defs/TopicAngle"
+      },
+      "maxItems": 5,
+      "title": "Angles",
+      "type": "array"
+    },
+    "titles": {
+      "description": "标题备选（悬念/反问/故事三类各至少一个时由上层约束）",
+      "items": {
+        "$ref": "#/$defs/TopicTitle"
+      },
+      "maxItems": 5,
+      "title": "Titles",
+      "type": "array"
+    },
+    "hook": {
+      "default": "",
+      "description": "开头钩子",
+      "maxLength": 500,
+      "title": "Hook",
+      "type": "string"
+    },
+    "value_landing": {
+      "default": "",
+      "description": "升华落点",
+      "maxLength": 500,
+      "title": "Value Landing",
+      "type": "string"
+    }
+  },
+  "required": [
+    "topic_id",
+    "title"
+  ],
+  "title": "TopicRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

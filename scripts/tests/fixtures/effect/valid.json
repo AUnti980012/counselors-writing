@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "effect_id": "eff-demo-0001",
+  "case_id": "case-demo-0001",
+  "draft_id": "drf-demo-0001",
+  "dimensions": {
+    "title": {"score": 4, "note": "反问式标题点击率高于平均。"},
+    "opening": {"score": 5, "note": "现场对话切入，留人效果好。"},
+    "paragraph_resonance": {"score": 4, "note": "匿名朗读段落转发最多。"},
+    "sublimation": {"score": 3, "note": "升华略显口号化。"},
+    "communication_data": {"score": null, "note": "阅读 1200，在看 45（示例数据）。"}
+  },
+  "feedback": "学生私聊说「被戳中了」。",
+  "retro": "真实场景切入 + 匿名机制叙事是本篇的复用点。",
+  "reusable_patterns": [
+    "班会现场细节比道理更有传播力"
+  ],
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

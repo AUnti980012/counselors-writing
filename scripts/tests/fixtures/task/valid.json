@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "task_id": "task-demo-0001",
+  "task_type": "research",
+  "status": "FETCHING",
+  "progress": 30,
+  "created_at": "2026-09-30T08:00:00+08:00",
+  "updated_at": "2026-09-30T08:05:00+08:00",
+  "input_refs": [{"kind": "source", "ref_id": "src-demo-0001"}],
+  "output_refs": [],
+  "retry": {"attempt": 0, "max_attempts": 3, "last_error": ""},
+  "context_refs": {"case": ["case-demo-0001"]},
+  "resumable": true
+}

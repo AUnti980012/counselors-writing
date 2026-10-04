@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "source_id": "src-demo-0001",
+  "url": "https://example.com/article/2026/09/demo.html",
+  "canonical_url": "https://example.com/article/2026/09/demo",
+  "domain": "example.com",
+  "title": "示例文章标题",
+  "author": "示例作者",
+  "publisher": "示例媒体",
+  "published_at": "2026-09-28T09:00:00+08:00",
+  "retrieved_at": "2026-09-30T09:10:00+08:00",
+  "retrieval_method": "http",
+  "status": "success",
+  "content_hash": null,
+  "metadata": {"section": "评论"}
+}

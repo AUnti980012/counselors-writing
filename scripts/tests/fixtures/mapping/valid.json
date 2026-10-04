@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "mapping_id": "map-demo-0001",
+  "case_ids": ["case-demo-0001"],
+  "profile_id": "pro-demo-0001",
+  "matching_points": [
+    {
+      "point": "案例的匿名参与设计与本校学生对公开表达的顾虑匹配。",
+      "case_id": "case-demo-0001",
+      "profile_field": "student_profile",
+      "evidence_ids": ["evd-demo-0001"]
+    }
+  ],
+  "differences": [
+    {
+      "difference": "本班人数较少，匿名箱机制需按班型调整。",
+      "case_id": "case-demo-0001",
+      "profile_field": "school_type"
+    }
+  ],
+  "adaptation_requirements": [
+    "班会时长需压缩到 40 分钟内。"
+  ],
+  "transferable_elements": [
+    "匿名收集 + 随机朗读机制"
+  ],
+  "non_transferable_elements": [
+    "案例中教师本人的十年故事（不可替代的个人叙事）"
+  ],
+  "risks": [
+    {"risk": "匿名朗读可能读出隐私内容", "level": "high"}
+  ],
+  "rationale": "外部成功案例不等于本地可直接套用：机制可迁移，叙事需本地化。",
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

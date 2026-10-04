@@ -1,0 +1,7 @@
+{
+  "topic_id": "top-bad-score-1",
+  "title": "分数越界的选题",
+  "angles": [
+    {"name": "成长", "score": 7.0, "reasoning": "超出 0-5 范围"}
+  ]
+}

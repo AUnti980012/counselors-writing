@@ -1,0 +1,129 @@
+{
+  "additionalProperties": false,
+  "description": "Artifact 契约：身份/血缘/保留策略。Artifact 是阶段间传递的指针载体。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "artifact_id": {
+      "description": "格式 TYPE-yyyymmdd-8hex，如 raw-20260930-a1b2c3d4",
+      "pattern": "^[a-z]+-\\d{8}-[0-9a-f]{8}$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "artifact_type": {
+      "description": "如 raw_html / processed_document / extraction / final_output",
+      "pattern": "^[a-z][a-z0-9_]{1,31}$",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "status": {
+      "default": "created",
+      "enum": [
+        "created",
+        "valid",
+        "invalid",
+        "failed",
+        "expired"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "path": {
+      "description": "仓库内相对路径（禁止绝对路径）",
+      "pattern": "^[A-Za-z0-9_./-]{1,255}$",
+      "title": "Path",
+      "type": "string"
+    },
+    "content_hash": {
+      "description": "内容哈希（NFC + 空白折叠后 sha256，M2 实现）",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "source_ids": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Source Ids",
+      "type": "array"
+    },
+    "parent_ids": {
+      "description": "血缘：上游 artifact_id 列表",
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Parent Ids",
+      "type": "array"
+    },
+    "retention": {
+      "default": "temporary",
+      "enum": [
+        "temporary",
+        "permanent",
+        "task_bound"
+      ],
+      "title": "Retention",
+      "type": "string"
+    },
+    "expires_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "过期时间（必须带时区）",
+      "title": "Expires At"
+    },
+    "summary": {
+      "default": "",
+      "description": "注入 LLM 上下文的摘要（唯一长文本字段）",
+      "maxLength": 500,
+      "title": "Summary",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "键值元数据（键 ≤20、值 ≤500）",
+      "maxProperties": 20,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "artifact_type",
+    "path",
+    "content_hash"
+  ],
+  "title": "ArtifactRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

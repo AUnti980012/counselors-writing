@@ -1,0 +1,113 @@
+{
+  "additionalProperties": false,
+  "description": "证据契约：独立记录，三级回指（artifact/document/chunk/source 至少其一）。\n\nexcerpt 为有界摘录（≤500 字符），禁止把整篇文章复制为「证据」。\nGC 引用检查以本表为事实/推断的引用来源之一（M7）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "evidence_id": {
+      "description": "推荐前缀 evd-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "quote",
+        "paraphrase",
+        "data_point",
+        "link",
+        "screenshot_desc"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "ref_artifact_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ref Artifact Id"
+    },
+    "ref_source_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ref Source Id"
+    },
+    "ref_document_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ref Document Id"
+    },
+    "ref_chunk_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ref Chunk Id"
+    },
+    "excerpt": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Excerpt",
+      "type": "string"
+    },
+    "note": {
+      "default": "",
+      "maxLength": 300,
+      "title": "Note",
+      "type": "string"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "kind"
+  ],
+  "title": "EvidenceRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

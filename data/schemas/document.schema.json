@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "DocSection": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Heading",
+          "type": "string"
+        },
+        "level": {
+          "default": 1,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        },
+        "char_start": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Char Start",
+          "type": "integer"
+        },
+        "char_end": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Char End",
+          "type": "integer"
+        }
+      },
+      "title": "DocSection",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "清洗后的正文文档（结构元数据 + 分块引用；正文本体存 chunk/artifact）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "document_id": {
+      "description": "推荐前缀 doc-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "source_id": {
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "content_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "language": {
+      "default": "unknown",
+      "enum": [
+        "zh",
+        "en",
+        "ja",
+        "auto",
+        "unknown"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "word_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Word Count",
+      "type": "integer"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/DocSection"
+      },
+      "maxItems": 200,
+      "title": "Sections",
+      "type": "array"
+    },
+    "chunk_ids": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+        "type": "string"
+      },
+      "maxItems": 500,
+      "title": "Chunk Ids",
+      "type": "array"
+    },
+    "processing": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "处理元数据（extractor/cleaned/耗时等，键 ≤20、值 ≤500）",
+      "maxProperties": 20,
+      "title": "Processing",
+      "type": "object"
+    }
+  },
+  "required": [
+    "document_id",
+    "source_id",
+    "content_hash"
+  ],
+  "title": "DocumentRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

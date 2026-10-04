@@ -1,0 +1,45 @@
+# Feature Inventory（V1 审计基线）
+
+> 本文件对应 Milestone Prompt Pack v1.0 的 M0 文档 `capability-inventory.md`（原名 `feature-inventory.md`，2026-09-30 随 pack 对齐改名）。
+> 合并规则：5 个探针产出的 44 条原始条目（跨探针存在重复视角）合并为 25 项规范功能。
+> 裁决依据（交叉核验员）：
+> - status 统一三级：**可用（机制可用；数据空壳/端到端未验证等缺口标注在 bug_risk）/ 半可用（外部依赖）/ 失效（永久失败占位）/ 占位（仅文档描述）**。案例库、风格库、报媒抓取判「可用」（探针 4 的降级理由作为已知缺口标注而非功能降级）；新榜判「失效」；抖音、去AI化判「半可用」。
+> - token 估算统一为量级估算；种子风格库采用逐字点算值约 1K tokens（探针 4/5 高估 2.5 倍，不采用）；外部 write-zh.md 实测 49KB/722 行 ≈ 1.5-2 万 token。
+> - 行号以探针 2/3 实测为准（case_lib.py=131 行、style_lib.py=98 行、profiles.py=98 行）。
+> - 标注 ⚠ 的为「已用户决策变更」：思政第二意见删除、抖音登录同意门禁、新榜移除。
+
+| ID | Feature | 当前实现 | 主要文件 | 状态 | 依赖 | Token 风险 | Bug 风险 | V2 迁移目标 | 优先级 |
+|---|---|---|---|---|---|---|---|---|---|
+| FEAT-01 | 爆款研究（报媒话术方法论） | 三件套沉淀法（话术/句式/标题风格）+ 检索 prompt 骨架 + 风格库检索 CLI | references/style-library.md:1-52；SKILL.md:19 | 可用 | style_lib.py；index.json | 中：读 reference 即载入内嵌种子；选题卡内联进检索 prompt；随沉淀线性增长 | 低：L59 占位注释已过期；「话术词不得生造」无校验机制 | RESEARCH+STYLE（结构化条目+SQLite 索引） | P1 |
+| FEAT-02 | 媒体风格研究（三报指纹） | 三报指纹速查表（气质/手法/适用场景）+ 3 条真实种子条目（三报均带来源与文章名；人民日报、中国青年报带日期，光明日报无日期） | references/style-library.md:5-11,55-89 | 可用 | — | 低：种子约 1K tokens（点算值） | 低：种子在 reference 内与 index.json 双源 | STYLE（种子迁入 data/knowledge/styles/seed.json，reference 只留方法） | P1 |
+| FEAT-03 | 微博热搜抓取 | urllib GET `weibo.com/ajax/side/hotSearch`（Chrome/120 UA + Referer），20s 超时，按 title 内存去重，输出 JSON `[{rank,title,heat,url}]` | scripts/fetch_hotlist.py:83-105 | 可用 | 仅标准库 | 低：≤20 条约 ≤2k token | 中：依赖非公开 ajax 接口，字段变更即全挂；无重试；heat 无归一化 | FETCH weibo 源适配器 + cache/raw 落盘 | P0 |
+| FEAT-04 | tophub 聚合热榜抓取 | GET tophub.today，正则提取 `<span class="t">/<span class="e">`，关键词过滤电商条目 | scripts/fetch_hotlist.py:69-80,108-121 | 可用 | 仅标准库 | 低 | 中：纯正则解析改版即失效（自认「站点结构可能已变」无第二解析路径）；url 恒空；heat 为 span.e 原文（跨源类型不一致） | FETCH tophub 源适配器（显式结构化降级） | P0 |
+| FEAT-05 | 新榜热点抓取 | 纯占位 stub：打印「反爬较强，暂不支持直抓」exit 1，无任何网络代码 | scripts/fetch_hotlist.py:124-126 | **失效** | 无 | 低（无输出） | 低：行为稳定（永远失败），但 SKILL.md:3 与 hot-trend.md:13 仍宣称支持（文档 bug） | ⚠ 移除能力声明，占位代码退役 | P2 |
+| FEAT-06 | 抖音热点抓取（CDP 实验项） | 经 web-access-main CDP 代理 localhost:3456 驱动已登录浏览器打开 douyin.com/hot，滚动后 /eval 取 `document.body.innerText` 整页 print | scripts/fetch_douyin.py:54-71 | **半可用** | web-access-main（Node 22+、localhost:3456）；用户登录态 | 极高：整页 innerText 无截断（3k-20k token） | 高：实际输出与 hot-trend.md:48 声称的「提取标题/话题/点赞」不符；target 提取脆弱；成功率不保证 | ⚠ 保留可选实验模块：运行时登录同意门禁（询问用户，拒绝→用户提供内容）+ 结构化提取 [{title,topic,likes}] + 限长 + 单次失败即退 | P2 |
+| FEAT-07 | 热点→选题桥接 prompt | 内置桥接 prompt：找真实接口、说明情绪入口、找不到就放弃（防硬蹭） | references/hot-trend.md:24-34 | 可用 | — | 低：热榜 JSON 注入约 1-2k token | 低：纯 prompt 无逻辑 | MAPPING（热榜先裁剪 top5-10 的 rank+title 再注入） | P2 |
+| FEAT-08 | 报媒正文抓取（三级回退） | ① read skill 本地提取器（readability-lxml）→ ② fetch-skill-main web 模式 → ③ 提示用户粘贴；子进程 90s 超时、强制 UTF-8 | scripts/fetch_article.py | 可用（移植风险：依赖兄弟 skill 相对路径 BASE/../..，缺失时静默退化，由 cross_platform findings 承载） | read skill；fetch-skill-main；readability-lxml+html2text（可选） | 高：整篇 Markdown 直出 stdout（3k-15k/篇），每次运行重抓（无缓存/哈希） | 中：无 URL 合法性校验即透传子进程；out.strip() 非空即判成功（可能把错误页当正文） | FETCH 通用 Fetcher + CLEAN + cache/raw 落盘 | P0 |
+| FEAT-09 | 用户提供内容兜底路径 | 指令级：粘贴正文/素材/反馈进 prompt；全仓无 PDF/DOCX/TXT/HTML 文件输入路径 | fetch_article.py:67-72；topic-selection.md:23；dissemination-review.md:19-20 | 可用 | 无 | 低：用户主动提供规模可控；无长度限制 | 低：路径可靠；仅不支持文件格式输入 | ACCESS/COMPLIANCE 用户提供内容通道，可扩展文件输入 | P0 |
+| FEAT-10 | 选题转化（素材→选题卡） | 五角度框架（成长/选择/责任/关系/家国情怀，各含定义/素材特征/标题句式/误区）+ 三步法 prompt（学生关心 3 点+依据→核心冲突→五角度 0-5 打分+理由）+ 质量自检 4 问 | references/topic-selection.md 全文 | 可用 | 无 | 中：完整 prompt 模板+框架表每轮进上下文（约 1.5K） | 低：五角度表与三步法轻微重叠；输出为自由文本选题卡（下游人工确认，风险低） | ANALYSIS（TopicCard 结构化，Pydantic 校验）+ ARTIFACT 传递 | P0 |
+| FEAT-11 | 写作陪伴（四段式+边写边审） | 四段式骨架（钩子/事件叙述/冲突展开/价值升华）+ 逐段写→逐段对照思政段落级项自查 + 全文初稿过两道门 + 汇总质检报告；可选 subagent 并行审校（仅文档描述） | references/writing-companion.md:5-35 | 可用 | 无 | 中：逐段反复对照 ideological-review.md + 逐段套 de-ai.md，审核清单在写作会话内消费 N+1 次 | 低：段落级/全文级检查项已明确分工，设计清晰 | WRITING（白名单：User Case+Selected Case+Analysis+Mapping+Style+Profile+Evidence） | P0 |
+| FEAT-12 | 思政审核（七项+第二意见） | 七项可勾选清单（政治方向/事实依据/价值表达/学生隐私/标签化语言/版权风险/AI 痕迹）+ 主模型自查/第二意见分工 + qwen verify 外发指令（content=全文）+ 结论判定（政治/隐私/事实任一不过即不过）+ 降级路径（标注「独立第二意见未执行」）+ 双栏报告 | references/ideological-review.md:1-82 | 可用 | ⚠ 原依赖 mcp__qwen-verify__verify（**已决策删除**）；report 模板 | 高：全文双传（主模型+第二模型各一遍，2k-8k×2）——**删除后消除** | 中：审核输出为 Markdown 非结构化；无冲突仲裁规则；清单与外发指令双重书写 | ⚠ AUDIT 单通道：七项结构化自查（JSON→Pydantic）+ 标点门禁；verdict 硬规则保留 | P0 |
+| FEAT-13 | 学生隐私检查 | 清单第 4 项 4 条（可定位信息/负面经历脱敏与同意/照片截图打码/私下谈话）+ SKILL.md:40 铁律（命中即默认脱敏）+ 案例库回写脱敏纪律 | ideological-review.md:25-29；SKILL.md:40；dissemination-review.md:65 | 可用 | 无 | 低 | 低：3 处重复强调但规则一致无冲突；**技术层零校验**（case_lib.py 对 PII 无任何检测） | AUDIT COMPLIANCE 检查项 + Evidence + 数据层脱敏校验 | P0 |
+| FEAT-14 | 标点门禁 | 426 行字符级检查器：语言检测（zh/en/ja/auto）+ 半角/全角标点 + 中西文空格 + 破折号 + fence/URL/链接豁免 + `--fix`（保 CRLF）；exit 0/1/2；调用点 4 处（SKILL.md:48、writing-companion.md:19、de-ai.md:25-34、ideological-review.md:45） | scripts/check_punctuation.py | 可用（write skill 副本，双份维护分叉风险） | 仅标准库；语法依赖 Python 3.7+（未 pin 版本） | 中：findings 逐行无上限（长文数百行全进上下文） | 中（交叉核验裁决，探针 5 的「低」不采用）：4 条可复核误报规则——数字+CJK 强制空格（239-242 行，`2026年`/`80后` 被标错）、em-dash 中英一刀切（207-212 行）、全角空格一律标错（244-247 行）、ko 静默放行 exit 0（404-408 行） | VALIDATION（收敛为唯一权威实现：修 4 规则 + `--max-findings` + JSON 输出；ko 改 exit 2） | P0 |
+| FEAT-15 | 去 AI 化 | 速查 7 条高频规则（删段末总结句/删硬升华/删模板连接词/拆排比/禁破折号/禁 emoji/翻译腔）+ 完整 24 类规则库外链至外部 write skill 的 write-zh.md（「去读这份」「以它为准」） | references/de-ai.md:1-38 | **半可用** | 外部 write-zh.md（**实测 49KB/722 行**；de-ai.md:10 硬编码用户绝对路径） | 高（交叉核验裁决，探针 5 的「低」不采用——漏计了强制加载的外部文件）：每次写正文全量加载 1.5-2 万 token 级外部规则库 | 中：绝对路径换机失效，功能静默降级为 7 条速查；与 ideological-review.md:42-45 重复维护同一批规则 | WRITING（AI 痕迹规则结构化入仓 + L1/L2 检索；绝对路径改发现机制） | P1 |
+| FEAT-16 | 传播复盘（五维度+回写） | 复盘五维度（标题/开头/段落共鸣/升华自然度/传播数据）+ prompt 骨架（内联完整案例 JSON + 反馈）+ 回写纪律（必须回写案例库与风格库、脱敏、只沉淀可复用经验）+ 复盘报告表 | references/dissemination-review.md:5-21,62-66 | 可用 | case_lib.py；style_lib.py | 中：复盘 prompt 整条 case JSON 回灌（每条 0.6k-1.8k，批量复盘线性增长） | 低：五维度与报告表一致；「复盘后必须写回」与「每交付一次尝试沉淀」两处纪律并存 | ANALYSIS+PERSIST（复盘结果结构化落库，artifact_id 传递，只传 case_id） | P2 |
+| FEAT-17 | 学校画像 | school.json 7 字段 + profiles.py get/set/dump；交付前读、复盘后写纪律 | data/profiles/school.json；scripts/profiles.py；references/school-profile.md | 可用 | 仅标准库 | 低：171 字节全空占位 | 中：set 任意 key 无白名单（拼写错误静默污染）；无 provenance/evidence；updated_at 文档示例（日期）与脚本实际（ISO+tz）漂移；「交付前读画像」不在主工作流显式步骤 | PROFILE（7 键白名单 + fact_type/evidence + 按字段 L2 读取） | P2 |
+| FEAT-18 | 案例库 | JSONL 追加式；add（stdin JSON，仅校验 {id,source_material,angles} 3 键存在性）+ search/list（全量载入线性扫描，整行 blob 子串匹配，5 字段摘要输出） | data/case_library/cases.jsonl；scripts/case_lib.py | 可用（数据空壳 + add→search 闭环从未经真实数据验证，schema 漂移潜伏） | 仅标准库 | 中：摘要含 source_material 长文本；`--top 0` 全量 bug（rows[-0:]=全库）；无上限校验 | 中：无 id 查重（重复行）；坏行静默 continue 零告警；关键词命中 JSON 字段名（搜 'angle' 命中全部行）；无文件锁 | CASE 模块（SQLite cases 表 + Pydantic 校验 + 幂等 upsert + L1/L2 + Artifact 引用） | P0 |
+| FEAT-19 | 风格库 | index.json `{"entries":[{source,type,text,added_at}]}`；add 覆写式保存；search 来源/类型精确过滤 + blob 子串，命中整条目输出 | data/style_library/index.json；scripts/style_lib.py | 可用（种子与用户库两套机制检索割裂：脚本查不到 reference 内种子） | 仅标准库 | 高：search 无 `--top`，kw 空即整库全字段 dump（随沉淀线性增长，200 条×150 字 ≈ 3-5 万 token） | 中：覆写式保存非原子（中断即损坏唯一副本）；缺 entries 键 KeyError；无去重；条目无 id 不可更新/删除 | STYLE 模块（SQLite+FTS5；origin=seed/user；L1 摘要投影 + `--top` 硬上限 10） | P1 |
+| FEAT-20 | 案例沉淀（复盘回写） | 无独立脚本的 LLM 流程：复盘后按 16 字段 schema 构造 JSON → case_lib.py add + style_lib.py add | SKILL.md:36,42；dissemination-review.md | **半可用** | case_lib.py；style_lib.py | 中：复盘需完整案例 JSON 入 prompt；检索回读受输出上限缺陷影响 | 中：字段漂移风险高（16 字段文档 schema 与脚本 3 键校验脱节）；重复沉淀无去重；脱敏零校验 | PERSIST（幂等 upsert + Pydantic 校验 + Artifact 引用 + 脱敏标记） | P1 |
+| FEAT-21 | 意图路由表 | 关键词→reference 静态映射 + 反问兜底 | SKILL.md:15-26 | 可用 | 无 | 低：仅表格本身进上下文 | 低：纯静态表；唯一风险是关键词覆盖不足 | ROUTER（自然语言路由保留；V2 升级为可执行的 TASK 生成器） | P0 |
+| FEAT-22 | 正文模板 | 四段式骨架 + 3 类标题备选（悬念/反问/故事）+ 落款（文风枚举/蹭的热点/预计阅读时长），全 {…} 占位符 | assets/article-template.md:1-43 | 可用 | 无 | 低：43 行 | 低：与 references 一致；无思政七项自查位（与审查要求脱节）；无 id/hash/status 元数据不可直接当 Artifact | ARTIFACT 模板 + Article Pydantic Schema 种子 | P1 |
+| FEAT-23 | 质检/复盘报告模板 | 质检：结论三态 + 七项双栏表（主模型自查/千问第二意见/结论）+ 必须修改项 + 修改落实；复盘：五维表 + 回写区 | assets/review-report-template.md:1-47 | 可用 | 无 | 低：约 47 行 | 低：三方对齐良好；仅 Markdown 无 JSON 约定；回写区无具体字段 schema | ⚠ AUDIT Schema 种子（七项=7 组 {self_check,verdict} 枚举；**双栏改单栏**）+ 复盘五维 | P1 |
+| FEAT-24 | 选题卡模板 | 素材一句话（脱敏）/推荐角度（角度名+分数/5、核心冲突、学生真正关心的、3 个标题备选、开头钩子、升华落点）/读者画像/建议文风 | assets/topic-card-template.md:1-32 | **半可用**（字段 drift） | 无 | 低：约 32 行 | 中：与三步法 prompt 字段 drift——标题要求 3-5 个（三类各至少一个）而模板固定 3 槽；「学生关心 3 点+依据」「逐角度打分理由」各只留一行位，信息会丢失 | TOPIC/ANALYSIS Schema 种子（angles 数组含 score/reasoning/evidence，titles 数组含 type 枚举） | P1 |
+| FEAT-25 | 并行审校 subagent（可选增强） | writing-companion.md 描述「环境支持时 spawn 只读审校 subagent 并行质检」，默认不依赖 | references/writing-companion.md:23-25 | **占位**（未实现，仅文档描述；subagent 机制为平台专属） | 无 | 无 | 低 | AUDIT 并行分支（Task Engine 支持时再实现，需平台 Adapter 抽象） | P3 |
+
+## 状态统计
+
+- 可用：19 项（FEAT-01~04、07~14、16~19、21~23）
+- 半可用：4 项（FEAT-06 抖音、FEAT-15 去AI化、FEAT-20 案例沉淀、FEAT-24 选题卡模板）；FEAT-08 报媒抓取机制可用、带移植风险标注
+- 失效：1 项（FEAT-05 新榜）
+- 占位：1 项（FEAT-25 subagent）
+- 数据层三文件全部为空壳；⚠ 出现在 4 行（FEAT-05/06/12/23）：3 项用户决策（第二意见删除、抖音登录同意门禁、新榜移除）+ 1 项衍生标注（FEAT-23 报告双栏改单栏）

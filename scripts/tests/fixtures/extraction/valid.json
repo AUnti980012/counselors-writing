@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "extraction_id": "ext-demo-0001",
+  "extractor": "case_facts",
+  "input_refs": {
+    "artifact_ids": ["raw-20260930-a1b2c3d4"],
+    "document_ids": ["doc-demo-0001"],
+    "chunk_ids": ["chk-demo-0001"]
+  },
+  "output_refs": {
+    "case_ids": ["case-demo-0001"],
+    "style_ids": [],
+    "topic_ids": []
+  },
+  "status": "success",
+  "attempts": 1,
+  "validation_errors": [],
+  "model_metadata": {"model": "test-mock", "mode": "economy", "temperature": null},
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}

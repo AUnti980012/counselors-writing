@@ -1,0 +1,150 @@
+{
+  "additionalProperties": false,
+  "description": "来源元数据契约。红线：不承载完整网页正文（raw 落 cache/raw，见 data-contract）。",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "description": "契约版本；变更契约时按语义化版本递增",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "创建时间（Python 托管；若显式给出必须带时区，如 +08:00）",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "更新时间（Python 托管；若显式给出必须带时区）",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "source_id": {
+      "description": "推荐前缀 src-",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "url": {
+      "description": "原始 URL（http/https）",
+      "maxLength": 2048,
+      "minLength": 8,
+      "title": "Url",
+      "type": "string"
+    },
+    "canonical_url": {
+      "anyOf": [
+        {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "归一化 canonical URL（M2）",
+      "title": "Canonical Url"
+    },
+    "domain": {
+      "default": "",
+      "maxLength": 253,
+      "title": "Domain",
+      "type": "string"
+    },
+    "title": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Title",
+      "type": "string"
+    },
+    "author": {
+      "default": "",
+      "maxLength": 200,
+      "title": "Author",
+      "type": "string"
+    },
+    "publisher": {
+      "default": "",
+      "maxLength": 200,
+      "title": "Publisher",
+      "type": "string"
+    },
+    "published_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "发布时间（必须带时区）",
+      "title": "Published At"
+    },
+    "retrieved_at": {
+      "format": "date-time",
+      "title": "Retrieved At",
+      "type": "string"
+    },
+    "retrieval_method": {
+      "default": "unknown",
+      "enum": [
+        "api",
+        "http",
+        "browser",
+        "user_provided",
+        "sibling_skill",
+        "unknown"
+      ],
+      "title": "Retrieval Method",
+      "type": "string"
+    },
+    "status": {
+      "default": "success",
+      "enum": [
+        "success",
+        "blocked",
+        "access_restricted",
+        "unavailable",
+        "timeout",
+        "rate_limited",
+        "parse_failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "content_hash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Content Hash"
+    },
+    "metadata": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 20,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "source_id",
+    "url"
+  ],
+  "title": "SourceRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

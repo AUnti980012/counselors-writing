@@ -1,0 +1,12 @@
+{
+  "case_id": "case-bad-fact-1",
+  "title": "事实缺证据的案例",
+  "background": "素材已脱敏。",
+  "documented_facts": [
+    {
+      "statement": "这是一条没有证据引用的事实。",
+      "fact_type": "documented_fact",
+      "evidence_ids": []
+    }
+  ]
+}

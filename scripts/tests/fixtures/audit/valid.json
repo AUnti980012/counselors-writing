@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "audit_id": "aud-demo-0001",
+  "draft_id": "drf-demo-0001",
+  "issues": [
+    {
+      "check": "ai_trace",
+      "verdict": "warn",
+      "note": "第二段出现「首先、其次、最后」模板化连接词，建议替换。",
+      "location": "第二段",
+      "evidence_ids": []
+    },
+    {
+      "check": "punctuation",
+      "verdict": "pass",
+      "note": "标点门禁通过。",
+      "location": "",
+      "evidence_ids": []
+    }
+  ],
+  "fact_check": {"passed": true, "notes": "政治方向与事实依据均通过。"},
+  "style_check": {"passed": true, "notes": "价值表达与标签化检查通过。"},
+  "format_check": {"passed": true, "notes": "标点与格式通过。"},
+  "risk_check": {"passed": true, "notes": "隐私与版权检查通过。"},
+  "passed": true,
+  "summary": "单通道七项自查通过，仅一处 AI 痕迹提示。",
+  "created_at": "2026-09-30T10:00:00+08:00",
+  "updated_at": "2026-09-30T10:00:00+08:00"
+}
