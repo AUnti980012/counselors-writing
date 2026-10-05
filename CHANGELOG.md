@@ -29,6 +29,17 @@ M10.1 最终运行时加固 + M10.2 通用内容写作（Gray Release）：系�
 
 全量测试必须通过：`python scripts/kb.py test`（当前基线 **484**；新增 16 条：通用写作 8 + schema_summary 6 + audit mode 2）。`python scripts/kb.py schemas export --check` 零漂移。
 
+### 灰度缺陷修复（证据链 / 血缘 / 隐私）
+
+灰度验证后修复三处核心缺陷（不改变四种版本号，仍为 Skill 2.2.0）：
+
+- **选题证据链**：`_inject_topic` 为每个角度生成独立 `EvidenceRecord`（回指 document/chunk，复用 case 事实证据模式），`angle.evidence_ids` 与 `topic.evidence_basis` 指向真实证据；无 `evidence_excerpt` 时退化为 paraphrase（有界、不伪造 id）。`topic_signal` prompt 增加 `evidence_excerpt` 指令。
+- **通用写作血缘**：`_aggregate_generic_lineage` 的 `evidence_ids` 由选题 `evidence_basis` 透传，`draft.lineage` 不再丢血缘。
+- **Prompt 隐私脱敏层**：`_source_projection` 对来源 chunk 文本/title 在进入 prompt 前统一确定性脱敏（学号/身份证/手机号/邮箱）。
+- **版本漂移修复**：AGENTS.md 误标 `2.3.0` 已纠正为 `2.2.0`。
+
+测试基线：**487**（新增 3 条：选题证据 quote 绑定、通用血缘透传、来源 PII 脱敏）。
+
 ### M10.1 变更
 
 - **Topic / Analysis / Mapping / Writing 语义收口（P0）**：`write --topic/--analysis/--style` 已确认真实进入实体读取 → 白名单投影 → prompt → lineage → draft_id；补 `test_topic_analysis_style_enter_prompt` 锁定。TopicRecord（`extract --extractor topic_signal`）与 AnalysisRecord（`analysis --case`）边界文档对齐。

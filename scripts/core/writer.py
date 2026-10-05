@@ -24,9 +24,9 @@ from typing import Any, Callable, Dict, List, Optional
 
 from core.analysis import _decode_cached
 from core.errors import ErrorDetail
-from core.extract import (ExtractionDeps, _redact_pii_recursive, _self_correct_prompt,
-                          _to_errors, default_extraction_deps, parse_llm_json,
-                          schema_summary)
+from core.extract import (ExtractionDeps, _redact_pii, _redact_pii_recursive,
+                          _self_correct_prompt, _to_errors, default_extraction_deps,
+                          parse_llm_json, schema_summary)
 from core.mapping import _profile_projection
 from core.schema import SCHEMA_VERSION
 from core.validate import MAX_SELF_CORRECT
@@ -147,13 +147,18 @@ def _generic_topic_projection(topic) -> Dict[str, Any]:
 
 
 def _source_projection(source, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """来源投影：元数据 + 有界分块片段（绝不整段 raw/全文回流——Token 检查点）。"""
+    """来源投影：元数据 + 有界分块片段（绝不整段 raw/全文回流——Token 检查点）。
+
+    PII 脱敏层：raw chunk 文本可能含学号/手机号/邮箱等结构化标识，进入 prompt 前
+    统一确定性脱敏（姓名靠 LLM 指令脱敏，此处兜底结构化模式——修复 prompt 隐私泄露）。
+    """
     return {
         "source_id": source.source_id,
-        "title": source.title[:200],
+        "title": _redact_pii(source.title[:200]),
         "domain": source.domain[:100],
         "publisher": source.publisher[:100],
-        "snippets": [c.get("text", "")[:_MAX_FIELD] for c in chunks][:_MAX_ITEMS],
+        "snippets": [_redact_pii(c.get("text", "")[:_MAX_FIELD])
+                     for c in chunks][:_MAX_ITEMS],
     }
 
 
@@ -213,13 +218,18 @@ def _aggregate_lineage(cases, mapping_id: str, profile_id: str,
 
 def _aggregate_generic_lineage(topic_id: str, source_ids: List[str],
                                style_id: Optional[str],
-                               profile_id: Optional[str]) -> Dict[str, Any]:
-    """通用写作 CONTENT LINEAGE：无 case/mapping，事实链 = topic_id + source_ids。"""
+                               profile_id: Optional[str],
+                               evidence_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    """通用写作 CONTENT LINEAGE：无 case/mapping，事实链 = topic_id + source_ids。
+
+    证据链：evidence_ids 由选题 evidence_basis 传播（修复「通用写作丢血缘」缺陷——
+    不得丢弃、不得伪造 evidence_ids，只透传选题已生成的真实证据引用）。
+    """
     lineage: Dict[str, Any] = {
         "topic_id": topic_id,
         "case_ids": [],
         "source_ids": list(source_ids)[:50],
-        "evidence_ids": [],
+        "evidence_ids": list(evidence_ids or [])[:50],
     }
     if style_id:
         lineage["style_id"] = style_id
@@ -661,7 +671,8 @@ def _write_generic(*, topic_id: str, llm_fn: Callable[[str], str],
     topic_proj = _generic_topic_projection(topic)
     style_proj = _style_projection(style) if style else None
     profile_proj = _profile_projection(profile) if profile else None
-    lineage = _aggregate_generic_lineage(topic_id, resolved_source_ids, style_id, profile_id)
+    lineage = _aggregate_generic_lineage(topic_id, resolved_source_ids, style_id,
+                                         profile_id, topic.evidence_basis)
     content_digest = hashlib.sha256(
         json.dumps({"topic": topic_proj, "sources": sources, "style": style_proj,
                     "profile": profile_proj, "lineage": lineage},

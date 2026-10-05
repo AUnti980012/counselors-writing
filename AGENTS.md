@@ -8,7 +8,7 @@
 - M10 产品化收口（Agent Adapter Contract：`--result` 回灌 + docs 分层）已落地。
 - M10.1 最终运行时加固已落地：`--result` 误回灌保护（绑定 wrapper）、SQLite 连接生命周期修复、Audit 全文规则澄清、Retro 增量触发。
 - M10.2 通用内容写作已落地：`write --topic`（无 mapping 的 Generic 路径）+ schema_summary 嵌套 $ref 展开 + audit mode 措辞。能力模型 = Case-based（Case→optional Analysis→Mapping→Writing）+ Generic（Topic→Sources→Writing），共同收口 Punctuation→Audit→Output。
-- 版本：Skill `2.3.0` / KB `0.12.0` / Schema `1.1.0` / DB `3`。
+- 版本：Skill `2.2.0` / KB `0.12.0` / Schema `1.1.0` / DB `3`。
 - **下一阶段：正式进入真实灰度，不再做大规模架构施工。**
 
 ## 2. 单一真相源
@@ -41,13 +41,13 @@ python scripts/kb.py schemas export --check                  # 契约零漂移�
 - 文档写了 `--result`，代码就必须支持；代码支持了，契约说明就必须写。禁止「文档有代码无」或「代码有契约无」的漂移。
 - Runtime 文档（SKILL/README/references/integration）禁止出现平台专属命令（如外部 LLM 命令名、MCP 工具名、第二模型名）与用户专属绝对路径。
 
-## 6. 本轮（M10.1）开发任务范围
+## 6. 本轮（灰度缺陷修复）开发任务范围
 
-1. `--result` 误回灌保护：`input_digest` 绑定 + `ResultBindingError`（已完成）。
-2. SQLite 连接生命周期：`cmd_fetch`/`cmd_ingest`/`cmd_artifact_create`/`cmd_artifact_status` 补 close（已完成）。
-3. result round-trip 黄金路径测试 + write 三参数语义测试（已完成）。
-4. Audit 全文规则澄清 + Retro 增量触发 + 文档去平台耦合（已完成）。
-5. 灰度测试操作说明（见 `docs/user/` 与交付报告）。
+1. **选题证据链**：`extract topic_signal` 为每个角度生成独立 EvidenceRecord（回指 document/chunk），并绑定 `evidence_basis`（已完成）。
+2. **通用写作血缘**：`write --topic` 的 `draft.lineage.evidence_ids` 透传选题 `evidence_basis`，不丢弃、不伪造（已完成）。
+3. **Prompt 隐私脱敏层**：来源 chunk 文本进入 prompt 前统一确定性脱敏（学号/手机号/邮箱/身份证）（已完成）。
+4. **版本漂移修复**：Skill 版本统一为 2.2.0（AGENTS.md 原误标 2.3.0 已纠正）（已完成）。
+5. 回归测试：选题证据生成 + 通用血缘透传 + 来源 PII 脱敏（已完成，全量 487）。
 
 ## 7. 历史文档路径说明
 

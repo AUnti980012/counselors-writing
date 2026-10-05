@@ -180,6 +180,30 @@ class ExtractTests(unittest.TestCase):
         topic = self.repo.get_topic(entity_id_for("topic", self.digest))
         self.assertIsNotNone(topic)
         self.assertEqual(topic.source_basis.source_ids, ["src-test123"])
+        # 选题证据链：evidence_basis 非空，angle.evidence_ids 指向真实 EvidenceRecord
+        self.assertEqual(len(topic.evidence_basis), 1)
+        self.assertEqual(topic.angles[0].evidence_ids, topic.evidence_basis)
+        evd = self.repo.get_record("evidence", topic.evidence_basis[0])
+        self.assertIsNotNone(evd)
+        self.assertEqual(evd.kind, "paraphrase")  # 无 evidence_excerpt → paraphrase
+        self.assertEqual(evd.ref_document_id, "doc-test123")
+
+    def test_topic_evidence_excerpt_quote(self):
+        """角度带 evidence_excerpt → quote 证据，excerpt 落地并绑定 document。"""
+        topic_data = dict(VALID_TOPIC)
+        topic_data["angles"] = [
+            {"name": "成长", "score": 4.5, "reasoning": "学生从迷茫走向方向。",
+             "evidence_excerpt": "第二个问题让学生意识到成长不是一蹴而就。"},
+        ]
+        llm = self._llm([json.dumps(topic_data, ensure_ascii=False)])
+        ptr = extract(extractor="topic_signal", document_id="doc-test123",
+                      llm_fn=llm, deps=self.deps)
+        self.assertEqual(ptr["status"], "success")
+        topic = self.repo.get_topic(entity_id_for("topic", self.digest))
+        evd = self.repo.get_record("evidence", topic.evidence_basis[0])
+        self.assertEqual(evd.kind, "quote")
+        self.assertEqual(evd.excerpt, "第二个问题让学生意识到成长不是一蹴而就。")
+        self.assertEqual(evd.ref_document_id, "doc-test123")
 
     # ---- 幂等 / cache 短路（Token 检查点 B） ----
 

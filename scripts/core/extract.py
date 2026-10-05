@@ -325,8 +325,10 @@ _INSTRUCTION = {
     "topic_signal": (
         "你是选题信号的结构化提取器。从下面的素材里识别选题信号：素材一句话、"
         "与学生群体的相关性、新颖性、适用性、预期读者、风险，以及五角度评价"
-        "（成长/选择/责任/关系/家国情怀）与标题备选。不要编造素材里没有的信息；"
-        "素材中的学生隐私信息（姓名/学号）必须脱敏。"),
+        "（成长/选择/责任/关系/家国情怀）与标题备选。每个角度可附 evidence_excerpt"
+        "（原文摘录，可选，≤300 字符，用于支撑该角度判断），不要填 evidence_ids"
+        "（由系统注入）。不要编造素材里没有的信息；素材中的学生隐私信息"
+        "（姓名/学号）必须脱敏。"),
 }
 
 
@@ -373,7 +375,8 @@ def _inject_deterministic(entity: str, extractor: str, data: Dict[str, Any],
     elif entity == "style":
         data, evidence_records = _inject_style(data, digest, source_ids, document_id)
     elif entity == "topic":
-        data, evidence_records = _inject_topic(data, digest, source_ids, document_id)
+        data, evidence_records = _inject_topic(data, digest, source_ids, document_id,
+                                               chunk_ids)
     else:
         raise ValueError(f"未知提取实体：{entity!r}")
     return data, evidence_records
@@ -463,7 +466,7 @@ def _inject_style(data: Dict[str, Any], digest: str, source_ids: List[str],
 
 
 def _inject_topic(data: Dict[str, Any], digest: str, source_ids: List[str],
-                  document_id: str) -> Tuple[Dict[str, Any], List[EvidenceRecord]]:
+                  document_id: str, chunk_ids: List[str]) -> Tuple[Dict[str, Any], List[EvidenceRecord]]:
     topic_id = entity_id_for("topic", digest)
     data["topic_id"] = topic_id
     data["source_basis"] = {
@@ -472,7 +475,33 @@ def _inject_topic(data: Dict[str, Any], digest: str, source_ids: List[str],
         "material_excerpt": str(data.get("summary", ""))[:500],
     }
     data["schema_version"] = SCHEMA_VERSION
-    return data, []
+
+    # 选题证据链（修复「选题缺证据链」缺陷）：为每个角度生成独立 EvidenceRecord
+    # （回指 document/chunk，与 case 事实证据同一模式），并把 evidence_basis 绑定
+    # 到选题输出。无 evidence_excerpt 时退化为 paraphrase（有界、不伪造 id）。
+    ref_kind, ref_id = _evidence_ref(document_id, chunk_ids, source_ids)
+    evidence_records: List[EvidenceRecord] = []
+    evidence_ids: List[str] = []
+    angles = data.get("angles")
+    if not isinstance(angles, list):
+        angles = data["angles"] = []
+    for i, angle in enumerate(angles):
+        if not isinstance(angle, dict):
+            continue
+        raw_excerpt = str(angle.pop("evidence_excerpt", "") or "").strip()
+        angle.pop("evidence_ids", None)  # 剥离 LLM 越权 id（Python 注入，防伪造）
+        statement = str(angle.get("reasoning", "") or angle.get("core_conflict", "")
+                        or data.get("summary", "")).strip()
+        had_excerpt = bool(raw_excerpt)
+        excerpt = _redact_pii(raw_excerpt)[:500] if had_excerpt else ""
+        evd_id = evidence_id_for(document_id or digest, "angle", i, statement)
+        angle["evidence_ids"] = [evd_id]
+        evidence_ids.append(evd_id)
+        evidence_records.append(_make_evidence_record(
+            evd_id, ref_kind, ref_id, had_excerpt, excerpt,
+            "" if had_excerpt else "无原文摘录（转述型证据，选题信号由角度 reasoning 承载）"))
+    data["evidence_basis"] = evidence_ids[:20]
+    return data, evidence_records
 
 
 # ---- 自纠正反馈 ----

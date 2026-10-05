@@ -157,6 +157,48 @@ class GenericWriteTests(unittest.TestCase):
         self.assertLess(len(prompt), MAX_PROMPT_CHARS + 20000,
                         "通用写作 prompt 必须受预算约束")
 
+    def test_generic_lineage_preserves_evidence_ids(self):
+        """通用写作血缘：选题 evidence_basis 必须透传到 draft.lineage.evidence_ids。"""
+        from core.schema import EvidenceRecord
+        from core.writer import write
+        self.repo.save_evidence(EvidenceRecord(
+            evidence_id="evd-x", kind="paraphrase", ref_source_id="src-x",
+            excerpt="", note="选题证据"))
+        self.repo.save_topic(TopicRecord(
+            topic_id="top-x", title="大学新生如何建立有效的学习节奏",
+            summary="面向大一新生谈学习节奏的通用指南",
+            expected_audience="大一新生", applicability="开学季学习指导",
+            hook="刚进大学，最常问的是怎么安排学习。",
+            value_landing="先稳定，再高效。",
+            evidence_basis=["evd-x"],
+            source_basis=SourceBasis(source_ids=["src-x"],
+                                     material_excerpt="稳定的学习节奏来自每天投入，而非突击。")))
+        llm = self._llm([json.dumps(VALID_DRAFT, ensure_ascii=False)])
+        ptr = write(topic_id="top-x", llm_fn=llm, deps=self.deps, mode="guide")
+        self.assertEqual(ptr["status"], "success")
+        draft = self.repo.get_draft(ptr["draft_id"])
+        self.assertEqual(draft.lineage.evidence_ids, ["evd-x"],
+                         "通用写作血缘必须透传选题 evidence_basis，不得丢弃/伪造")
+        self.assertEqual(draft.lineage.topic_id, "top-x")
+        self.assertEqual(draft.lineage.case_ids, [])
+
+    def test_source_projection_redacts_pii(self):
+        """PII 脱敏层：raw chunk 文本进入 prompt 前必须剥离结构化标识。"""
+        from core.writer import _source_projection
+        self.repo.save_chunk(ChunkRecord(
+            chunk_id="chk-pii", document_id="doc-x", source_id="src-x", sequence=9,
+            heading="", text="联系方式：手机13812345678，邮箱 zhang@example.com，"
+                             "学号 202101234567。"))
+        source = self.repo.get_source("src-x")
+        chunks = self.repo.source_chunks("src-x")
+        joined = "\n".join(_source_projection(source, chunks)["snippets"])
+        self.assertNotIn("13812345678", joined, "手机号必须脱敏")
+        self.assertNotIn("zhang@example.com", joined, "邮箱必须脱敏")
+        self.assertNotIn("202101234567", joined, "学号必须脱敏")
+        self.assertIn("[手机号]", joined)
+        self.assertIn("[邮箱]", joined)
+        self.assertIn("[学号]", joined)
+
 
 if __name__ == "__main__":
     unittest.main()
