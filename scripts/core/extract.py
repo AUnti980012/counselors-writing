@@ -213,7 +213,7 @@ def _json_type(spec: Dict[str, Any], defs: Dict[str, Any] = None,
     if t == "object":
         return _object_shape(spec, defs, depth)
     if t:
-        return t
+        return t + _constraints(spec)
     if "$ref" in spec:
         return _json_type(defs.get(spec["$ref"].split("/")[-1], {}), defs, depth)
     return "object"
@@ -245,17 +245,40 @@ def _object_shape(spec: Dict[str, Any], defs: Dict[str, Any], depth: int) -> str
 
 
 def _scalar(spec: Dict[str, Any], defs: Dict[str, Any]) -> str:
-    """字段级标量类型：不再展开 object 内容，只给类型名或浅层 array<X>。"""
+    """字段级标量类型：不再展开 object 内容，只给类型名 + 约束或浅层 array<X>。"""
     t = spec.get("type")
     if t == "array":
         items = spec.get("items", {})
         inner = items.get("type") or (items.get("$ref", "").split("/")[-1] or "?")
         return f"array<{inner}>"
     if t:
-        return t
+        return t + _constraints(spec)
     if "$ref" in spec:
         return spec["$ref"].split("/")[-1]
     return "object"
+
+
+def _constraints(spec: Dict[str, Any]) -> str:
+    """字段级约束后缀（P3-1）：enum / minimum / maximum，不存在的约束省略。
+
+    让 Agent 在 --prompt-only 下即可知道「type 只能是 suspense/question/story」、
+    「score 必须在 0-5」这类硬约束，避免首轮产出被 Pydantic 拒绝。不复制完整
+    JSON Schema（Token Economy）：只输出字段自身携带的枚举与数值范围。
+    """
+    parts: List[str] = []
+    if "enum" in spec:
+        # 用 / 分隔，避免与 _object_shape 的 ", " 字段分隔符混淆
+        parts.append("enum: " + "/".join(str(v) for v in spec["enum"]))
+    mn = spec.get("minimum")
+    mx = spec.get("maximum")
+    if mn is not None or mx is not None:
+        if mn is not None and mx is not None:
+            parts.append(f"min: {mn}, max: {mx}")
+        elif mn is not None:
+            parts.append(f"min: {mn}")
+        else:
+            parts.append(f"max: {mx}")
+    return "(" + ", ".join(parts) + ")" if parts else ""
 
 
 # ---- prompt 构造 ----
@@ -610,6 +633,47 @@ class ResultBindingError(ValueError):
     """
 
 
+def _read_result_file(path: str, *, expected_operation: str = None,
+                      expected_input_digest: str = None) -> str:
+    """读取 --result 文件并做绑定校验，返回「应回灌的 JSON 字符串」。
+
+    文件可为「原始实体 JSON」（向后兼容）或绑定 wrapper：
+
+        {"operation": "<op>", "input_digest": "<request-digest>", "result": {…实体 JSON…}}
+
+    传入 expected_operation / expected_input_digest 时，若是 wrapper 则校验绑定
+    （不匹配抛 ResultBindingError），并解包出 result；原始实体 JSON 原样通过
+    （绑定为可选增强）。文件不可读/为空抛 LLMCallError（LLM 依赖失败语义，
+    CLI exit 3，源数据不损坏）。
+    """
+    path = (path or "").strip()
+    if not path:
+        raise ValueError("结果文件路径不能为空")
+    try:
+        with open(path, encoding="utf-8") as f:
+            content = f.read()
+    except OSError as exc:
+        raise LLMCallError(f"结果文件无法读取：{exc.strerror or exc}") from None
+    if not content.strip():
+        raise LLMCallError(f"结果文件为空：{path}")
+    if expected_operation is None and expected_input_digest is None:
+        return content
+    try:
+        obj = json.loads(content)
+    except (json.JSONDecodeError, ValueError):
+        obj = None
+    if isinstance(obj, dict) and "result" in obj and "operation" in obj:
+        if expected_operation is not None and obj.get("operation") != expected_operation:
+            raise ResultBindingError(
+                f"结果文件 operation={obj.get('operation')!r} 与当前命令 "
+                f"{expected_operation!r} 不匹配（可能误提交了另一个命令的 JSON）")
+        if expected_input_digest is not None and obj.get("input_digest") != expected_input_digest:
+            raise ResultBindingError(
+                "结果文件 input_digest 与当前请求不匹配（可能误提交了另一个任务的 JSON）")
+        return json.dumps(obj["result"], ensure_ascii=False)
+    return content
+
+
 def llm_fn_from_file(path: str, *, expected_operation: str = None,
                      expected_input_digest: str = None) -> Callable[[str], str]:
     """从文件读取 Agent 已产出的 JSON 结果（--result 回灌，M10 Agent Adapter Contract）。
@@ -619,44 +683,36 @@ def llm_fn_from_file(path: str, *, expected_operation: str = None,
     里的 JSON 原样交回既有 parse → inject → validate → persist 流程，不复制任何
     新的写入路径。
 
-    误回灌保护（M10.1）：文件可为「原始实体 JSON」（向后兼容）或可选绑定 wrapper：
-
-        {"operation": "<op>", "input_digest": "<request-digest>", "result": {…实体 JSON…}}
-
-    传入 expected_operation / expected_input_digest 时，若文件是 wrapper 则校验
-    绑定（不匹配抛 ResultBindingError），并解包出 result；若是原始实体 JSON 则
-    原样通过（绑定为可选增强，不强制）。文件不可读/为空抛 LLMCallError（LLM
-    依赖失败语义，CLI exit 3，源数据不损坏）。
+    误回灌保护（M10.1 + P3-3）：返回的 callable 带 preflight 钩子，核心函数用
+    preflight_binding 在 Cache Lookup 之前调用它做绑定校验（operation /
+    input_digest）；llm_fn 被调用（MISS 路径）时也会再次校验（防御性重复、幂等）。
+    文件不可读/为空抛 LLMCallError。
     """
-    path = (path or "").strip()
-    if not path:
-        raise ValueError("结果文件路径不能为空")
 
     def llm_fn(prompt: str) -> str:
-        try:
-            with open(path, encoding="utf-8") as f:
-                content = f.read()
-        except OSError as exc:
-            raise LLMCallError(f"结果文件无法读取：{exc.strerror or exc}") from None
-        if not content.strip():
-            raise LLMCallError(f"结果文件为空：{path}")
-        if expected_operation is not None or expected_input_digest is not None:
-            try:
-                obj = json.loads(content)
-            except (json.JSONDecodeError, ValueError):
-                obj = None
-            if isinstance(obj, dict) and "result" in obj and "operation" in obj:
-                if expected_operation is not None and obj.get("operation") != expected_operation:
-                    raise ResultBindingError(
-                        f"结果文件 operation={obj.get('operation')!r} 与当前命令 "
-                        f"{expected_operation!r} 不匹配（可能误提交了另一个命令的 JSON）")
-                if expected_input_digest is not None and obj.get("input_digest") != expected_input_digest:
-                    raise ResultBindingError(
-                        "结果文件 input_digest 与当前请求不匹配（可能误提交了另一个任务的 JSON）")
-                return json.dumps(obj["result"], ensure_ascii=False)
-        return content
+        return _read_result_file(path, expected_operation=expected_operation,
+                                 expected_input_digest=expected_input_digest)
 
+    def preflight() -> None:
+        # P3-3：绑定预检，核心函数在 Cache Lookup 之前调用；只校验不消费结果
+        _read_result_file(path, expected_operation=expected_operation,
+                          expected_input_digest=expected_input_digest)
+
+    llm_fn.preflight = preflight  # type: ignore[attr-defined]
     return llm_fn
+
+
+def preflight_binding(llm_fn: Callable[[str], str]) -> None:
+    """P3-3：--result 回灌的绑定预检，核心函数必须在 Cache Lookup 之前调用。
+
+    仅 llm_fn_from_file 返回的 callable 带 preflight 钩子；--llm-cmd / mock
+    llm_fn 无钩子则跳过。绑定不匹配抛 ResultBindingError（CLI 映射 exit 2），
+    文件不可读/为空抛 LLMCallError（exit 3）。这样 Cache HIT 无法绕过
+    External Result Binding Validation。
+    """
+    hook = getattr(llm_fn, "preflight", None)
+    if hook is not None:
+        hook()
 
 
 # ---- 主入口 ----
@@ -702,6 +758,9 @@ def extract(*, extractor: str, llm_fn: Callable[[str], str],
     # 输入内容哈希：优先 document 的 content_hash，否则 chunk 文本组合哈希
     digest = doc.content_hash if doc is not None else _chunks_digest(chunks)
     cache_key = extraction_cache_key(extractor, digest, model_mode)
+
+    # P3-3：--result 绑定预检必须先于 Cache Lookup（HIT 不能绕过 binding 校验）
+    preflight_binding(llm_fn)
 
     # 幂等短路：extraction_cache 命中且输出实体仍存在 → 零 LLM（Token 检查点 B）
     if use_cache:

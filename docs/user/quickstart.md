@@ -69,8 +69,8 @@ python scripts/kb.py audit --draft <draft_id> --llm-cmd "<你的 LLM 命令>"
 ## 7. 输出
 
 ```bash
-python scripts/kb.py output render --draft <draft_id>
-# 加 --content 直接打印正文
+python scripts/kb.py output render --draft <draft_id> --audit <audit_id>
+# --audit 把审核 id 写进 final_output 血缘（audited output 应带）；加 --content 直接打印正文
 ```
 
 ---

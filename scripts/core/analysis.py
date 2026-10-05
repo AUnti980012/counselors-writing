@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, List, Optional
 from core.errors import ErrorDetail
 from core.extract import (ExtractionDeps, _redact_pii_recursive, _self_correct_prompt,
                           _to_errors, default_extraction_deps, llm_fn_from_cmd,
-                          parse_llm_json, schema_summary)
+                          parse_llm_json, preflight_binding, schema_summary)
 from core.schema import SCHEMA_VERSION
 from core.validate import MAX_SELF_CORRECT
 
@@ -200,6 +200,9 @@ def analyze(*, case_ids: List[str], llm_fn: Callable[[str], str],
     projections = [_case_projection(c) for c in cases]
     content_digest = _projection_digest(projections)
     cache_key = analysis_cache_key(case_ids, model_mode, content_digest)
+
+    # P3-3：--result 绑定预检必须先于 Cache Lookup（HIT 不能绕过 binding 校验）
+    preflight_binding(llm_fn)
 
     # 幂等短路：cache 命中且输出实体仍存在 → 零 LLM（Token 检查点 D）
     if use_cache:

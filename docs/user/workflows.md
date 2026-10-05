@@ -12,7 +12,7 @@ ingest（素材 → document）
   ↓ mapping --case <id> --profile pro-school（→ Mapping）
   ↓ write --mapping <id>（→ Draft）
   ↓ punctuation + audit（标点门禁 + 七项思政自查）
-  ↓ output render（→ 最终 Markdown）
+  ↓ output render --audit <audit_id>（→ 最终 Markdown，血缘关联 audit）
   ↓ case add / style add（复盘沉淀：有增量才做，不阻塞交付）
 ```
 

@@ -73,7 +73,8 @@ def _llm_fn(args: argparse.Namespace, operation: str, input_digest: str):
 
     --result 用 llm_fn_from_file（读 Agent 已产出的 JSON 文件），与 --llm-cmd
     走完全相同的 parse → inject → validate → persist 路径，不复制写入逻辑；
-    并带 operation/input_digest 绑定校验（M10.1 误回灌保护）。
+    并带 operation/input_digest 绑定校验（M10.1 误回灌保护，P3-3 在核心函数的
+    Cache Lookup 之前通过 llm_fn 的 preflight 钩子执行）。
     """
     from core.extract import llm_fn_from_cmd, llm_fn_from_file
 

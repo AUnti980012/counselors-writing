@@ -26,7 +26,7 @@ from core.analysis import _decode_cached
 from core.errors import ErrorDetail
 from core.extract import (ExtractionDeps, _redact_pii, _redact_pii_recursive,
                           _self_correct_prompt, _to_errors, default_extraction_deps,
-                          parse_llm_json, schema_summary)
+                          parse_llm_json, preflight_binding, schema_summary)
 from core.mapping import _profile_projection
 from core.schema import SCHEMA_VERSION
 from core.validate import MAX_SELF_CORRECT
@@ -619,6 +619,9 @@ def _write_case(*, mapping_id: str, llm_fn: Callable[[str], str],
     cache_key = writing_cache_key(f"mapping:{mapping_id}", mode, model_mode, content_digest)
     draft_id = draft_id_for(mapping_id, mode, model_mode, style_id, topic_id, analysis_id)
 
+    # P3-3：--result 绑定预检必须先于 Cache Lookup（HIT 不能绕过 binding 校验）
+    preflight_binding(llm_fn)
+
     if use_cache:
         cached, _ = deps.cache.get("tasks", cache_key)
         if cached is not None:
@@ -680,6 +683,9 @@ def _write_generic(*, topic_id: str, llm_fn: Callable[[str], str],
     cache_key = writing_cache_key(f"topic:{topic_id}", mode, model_mode, content_digest)
     draft_id = draft_id_for(None, mode, model_mode, style_id, topic_id,
                             None, profile_id, resolved_source_ids)
+
+    # P3-3：--result 绑定预检必须先于 Cache Lookup（HIT 不能绕过 binding 校验）
+    preflight_binding(llm_fn)
 
     if use_cache:
         cached, _ = deps.cache.get("tasks", cache_key)

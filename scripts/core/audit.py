@@ -28,7 +28,7 @@ from core.analysis import _decode_cached
 from core.errors import ErrorDetail
 from core.extract import (ExtractionDeps, _redact_pii, _redact_pii_recursive,
                           _self_correct_prompt, _to_errors, default_extraction_deps,
-                          parse_llm_json, schema_summary)
+                          parse_llm_json, preflight_binding, schema_summary)
 from core.punctuation import check_text
 from core.schema import SCHEMA_VERSION
 from core.validate import MAX_SELF_CORRECT
@@ -225,6 +225,9 @@ def audit(*, draft_id: str, llm_fn: Callable[[str], str],
     content_digest = hashlib.sha256(fulltext.encode("utf-8")).hexdigest()
     cache_key = audit_cache_key(draft_id, model_mode, content_digest)
     audit_id = audit_id_for(draft_id, model_mode)
+
+    # P3-3：--result 绑定预检必须先于 Cache Lookup（HIT 不能绕过 binding 校验）
+    preflight_binding(llm_fn)
 
     if use_cache:
         cached, _ = deps.cache.get("tasks", cache_key)

@@ -588,8 +588,10 @@ class SchemaSummaryTests(unittest.TestCase):
     def test_topic_nested_refs_expanded(self):
         from core.extract import schema_summary
         s = schema_summary("topic")
-        self.assertIn("array<{name: string, score: number}>", s, "angles 应展开必填字段")
-        self.assertIn("array<{type: string, text: string}>", s, "titles 应展开必填字段")
+        self.assertIn("array<{name: string, score: number(min: 0, max: 5)}>", s,
+                      "angles 应展开必填字段并暴露 score 范围")
+        self.assertIn("array<{type: string(enum: suspense/question/story), text: string}>", s,
+                      "titles 应展开必填字段并暴露 type 枚举")
 
     def test_mapping_nested_refs_expanded(self):
         from core.extract import schema_summary
@@ -601,7 +603,10 @@ class SchemaSummaryTests(unittest.TestCase):
     def test_draft_and_audit_nested_refs(self):
         from core.extract import schema_summary
         self.assertIn("array<{content: string}>", schema_summary("draft"))
-        self.assertIn("array<{check: string, verdict: string}>", schema_summary("audit"))
+        self.assertIn("check: string(enum:", schema_summary("audit"),
+                      "audit check 应暴露枚举")
+        self.assertIn("verdict: string(enum: pass/warn/fail)", schema_summary("audit"),
+                      "audit verdict 应暴露枚举")
 
     def test_primitive_and_scalar_types(self):
         from core.extract import _json_type
@@ -625,6 +630,53 @@ class SchemaSummaryTests(unittest.TestCase):
         spec = {"type": "array", "items": {"type": "object",
                 "properties": {"x": {"type": "string"}}, "required": ["x"]}}
         self.assertEqual(_json_type(spec), "array<{x: string}>")
+
+
+class SchemaSummaryConstraintTests(unittest.TestCase):
+    """P3-1：schema_summary 暴露 enum / min / max / required 等关键约束（不全量复制 JSON Schema）。"""
+
+    def test_string_type(self):
+        from core.extract import _json_type
+        self.assertEqual(_json_type({"type": "string"}), "string")
+
+    def test_number_min_max(self):
+        from core.extract import _json_type
+        self.assertEqual(_json_type({"type": "number", "minimum": 0, "maximum": 5}),
+                         "number(min: 0, max: 5)")
+
+    def test_integer_min_only(self):
+        from core.extract import _json_type
+        self.assertEqual(_json_type({"type": "integer", "minimum": 1}), "integer(min: 1)")
+
+    def test_array_items_type(self):
+        from core.extract import _json_type
+        self.assertEqual(_json_type({"type": "array", "items": {"type": "string"}}),
+                         "array<string>")
+
+    def test_object_ref_one_level(self):
+        from core.extract import _json_type
+        defs = {"Obj": {"type": "object", "properties": {"x": {"type": "string"}},
+                        "required": ["x"]}}
+        self.assertEqual(_json_type({"$ref": "#/$defs/Obj"}, defs), "{x: string}")
+
+    def test_enum(self):
+        from core.extract import _json_type
+        self.assertEqual(_json_type({"type": "string", "enum": ["suspense", "question", "story"]}),
+                         "string(enum: suspense/question/story)")
+
+    def test_required_marked_in_summary(self):
+        from core.extract import schema_summary
+        s = schema_summary("topic")
+        self.assertIn("title（必填，string）", s)
+        self.assertIn("summary（可选，string）", s)
+
+    def test_summary_not_full_schema_copy(self):
+        from core.extract import schema_summary
+        s = schema_summary("topic")
+        self.assertNotIn("maxLength", s, "不应复制长度等噪音约束")
+        self.assertNotIn("additionalProperties", s)
+        self.assertNotIn('"$defs"', s)
+        self.assertLess(len(s), 1500, "schema_summary 应保持紧凑，不得接近完整 JSON Schema 体量")
 
 
 if __name__ == "__main__":

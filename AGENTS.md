@@ -35,6 +35,14 @@ python scripts/kb.py schemas export --check                  # 契约零漂移�
 
 改动后**全量必须通过**；新增功能必须补最小必要测试（含回归锁）。
 
+### 灰度/MTest 报告的 LLM 调用统计口径（P3-4）
+
+- 统计单位 = **Physical LLM Invocation**（真正向 LLM provider / `--llm-cmd` 发起的一次模型调用；`--result` 回灌不产生模型调用）。
+- Retry 是 Physical Invocation 的属性，不额外计数：`1 initial + 1 retry = 2 physical calls = 1 retry`。
+- 分开统计 Physical / Retries / Cache Hits / Cache Misses；`TOTAL = Σ 各 scenario physical + Σ explicit extra/contract-smoke physical`。
+- 不计入 Physical LLM：Python/SQLite/FTS5/文件/Pydantic/CLI 解析/cache lookup/MCP tool call/HTTP fetch/HTML parser。
+- Token 必须区分 **Actual**（provider 报告）与 **Estimated**（字符估算，如 char/1.6），不得混写。
+
 ## 5. 版本与文档一致性要求
 
 - 四种版本号语义分离，禁止无理由同步改：Skill（用户可见行为）/ KB（CLI 接口）/ Schema（数据契约）/ DB（SQLite migration）。

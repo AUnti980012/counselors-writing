@@ -271,7 +271,7 @@ kb.py context-for-write --mapping <id>    白名单审计输出（Token 检查�
 kb.py write --mapping <id> --llm-cmd ...  LLM 写作 → DraftRecord（articles/ canonical + draft artifact）
 kb.py audit --draft <id> --llm-cmd ...    LLM 七项自查 + 标点门禁 → AuditRecord（audits/ + audit artifact）
 kb.py punctuation <file>                   标点门禁（确定性，零 LLM；C-03/C-09）
-kb.py output render --draft <id>           draft → FINAL artifact（permanent，零 LLM）
+kb.py output render --draft <id> --audit <audit_id>   draft → FINAL artifact（permanent，零 LLM；--audit 写入血缘 metadata）
 ```
 
 - **写作白名单**（pack M6 STEP 1 / G-18）：writer 代码级只注入批准的 topic/case/analysis/mapping/style/profile（结构化投影，字段级截断）；deny 清单（raw HTML/完整原文/整库/历史）不进上下文；lineage 由 Python 从输入聚合（case_ids/source_ids/evidence_ids 去重）——每个主要事实性断言可追溯。

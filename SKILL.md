@@ -49,7 +49,7 @@ metadata:
 ### 两条路径共同收口
 
 6. **过门**：`kb.py punctuation --lang zh <正文>`（零 LLM）+ `kb.py audit --draft <id>`（七项自查，按 draft.mode 措辞）。
-7. **交付**：`kb.py output render --draft <id>`。
+7. **交付**：`kb.py output render --draft <id> --audit <audit_id>`（`--audit` 把审核 id 写进 final_output 血缘，audited output 应带；换格式重渲染可省略）。
 8. **复盘沉淀**：`kb.py case add` / `kb.py style add`（不阻塞交付）。
 
 ## 4. Hard Rules

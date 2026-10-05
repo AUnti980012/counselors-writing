@@ -30,8 +30,8 @@ python scripts/kb.py write --mapping <mapping_id> --llm-cmd "<LLM_COMMAND>"
 # 6) 审核（标点门禁 + 七项思政自查）
 python scripts/kb.py punctuation --lang zh 正文.md
 python scripts/kb.py audit --draft <draft_id> --llm-cmd "<LLM_COMMAND>"
-# 7) 输出
-python scripts/kb.py output render --draft <draft_id>
+# 7) 输出（audited output 带 --audit 写入血缘）
+python scripts/kb.py output render --draft <draft_id> --audit <audit_id>
 ```
 
 > 没有外部 LLM 命令时，用 `--prompt-only` 拿 prompt → 你的 Agent 生成 JSON → `--result <file>` 回灌，三步等价。详见下文「在不同 Agent 里使用」。
@@ -45,9 +45,9 @@ python scripts/kb.py ingest --file 政策资料.txt
 python scripts/kb.py extract <document_id> --extractor topic_signal --llm-cmd "<LLM_COMMAND>"
 # 3) 通用写作（不需要 mapping、不需要伪造 case）
 python scripts/kb.py write --topic <topic_id> --mode guide --llm-cmd "<LLM_COMMAND>"
-# 4) 过门 + 输出（与案例写作一致）
+# 4) 过门 + 输出（与案例写作一致，audited output 带 --audit）
 python scripts/kb.py audit --draft <draft_id> --llm-cmd "<LLM_COMMAND>"
-python scripts/kb.py output render --draft <draft_id>
+python scripts/kb.py output render --draft <draft_id> --audit <audit_id>
 ```
 
 > 政策数字、调查数据、时间节点、机构名称必须来自来源素材；来源没有的写清楚是「推断/建议」。严禁把通用内容捏造成学生案例。

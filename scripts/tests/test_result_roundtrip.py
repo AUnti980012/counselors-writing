@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 from core import db
-from core.analysis import analyze
+from core.analysis import analysis_id_for, analyze
 from core.artifact import ArtifactStore, Registry
 from core.audit import audit
 from core.cache import CacheManager
@@ -181,6 +181,97 @@ class ResultRoundtripTests(unittest.TestCase):
         fn = llm_fn_from_file(str(Path(self.tmp.name) / "nope.json"))
         with self.assertRaises(LLMCallError):
             fn("ignored")
+
+
+class BindingBeforeCacheTests(unittest.TestCase):
+    """P3-3：--result 绑定校验必须先于 Cache Lookup（Cache HIT 不能绕过 binding 校验）。
+
+    覆盖 Gate 2（MISS+正确绑定 persist）/ Gate 3（HIT+正确绑定 reuse）/
+    Gate 4（MISS+错误 digest 拒绝）/ Gate 5（HIT+错误 digest 拒绝）/
+    Gate 6（HIT+错误 operation 拒绝）。
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.conn = db.connect(root / "t.db")
+        db.init_db(self.conn)
+        self.repo = Repository(self.conn, root / "knowledge", root / "seed.json")
+        self.store = ArtifactStore(root / "artifacts",
+                                   Registry(root / "registry" / "artifacts.jsonl"),
+                                   index_sync=self.repo.upsert_artifact)
+        self.cache = CacheManager(root=root / "cache")
+        self.deps = ExtractionDeps(repo=self.repo, store=self.store,
+                                   cache=self.cache, conn=self.conn)
+        self.repo.save_case(CaseRecord(
+            case_id="case-a", title="班会案例", background="班会案例的背景",
+            problem="迷茫与选择", tags=["班会"]))
+
+    def tearDown(self):
+        self.conn.close()
+        self.tmp.cleanup()
+
+    def _write(self, content: str) -> str:
+        p = Path(self.tmp.name) / "result.json"
+        p.write_text(content, encoding="utf-8")
+        return str(p)
+
+    def _fn(self, wrapper: dict, operation: str, digest: str):
+        return llm_fn_from_file(self._write(json.dumps(wrapper, ensure_ascii=False)),
+                                expected_operation=operation,
+                                expected_input_digest=digest)
+
+    def test_miss_correct_binding_persists(self):
+        ptr = analyze(case_ids=["case-a"],
+                      llm_fn=self._fn({"operation": "analysis", "input_digest": "d",
+                                       "result": VALID_ANALYSIS}, "analysis", "d"),
+                      deps=self.deps)
+        self.assertEqual(ptr["status"], "success")
+        self.assertFalse(ptr.get("reused"))
+        self.assertIsNotNone(self.repo.get_analysis(ptr["analysis_id"]))
+
+    def test_hit_correct_binding_reuses(self):
+        def make():
+            return self._fn({"operation": "analysis", "input_digest": "d",
+                             "result": VALID_ANALYSIS}, "analysis", "d")
+        p1 = analyze(case_ids=["case-a"], llm_fn=make(), deps=self.deps)
+        p2 = analyze(case_ids=["case-a"], llm_fn=make(), deps=self.deps)
+        self.assertTrue(p2["reused"])
+        self.assertEqual(p1["analysis_id"], p2["analysis_id"])
+
+    def test_miss_wrong_digest_rejected(self):
+        with self.assertRaises(ResultBindingError):
+            analyze(case_ids=["case-a"],
+                    llm_fn=self._fn({"operation": "analysis", "input_digest": "wrong",
+                                     "result": VALID_ANALYSIS}, "analysis", "right"),
+                    deps=self.deps)
+        self.assertFalse(self.repo.has_record("analysis", analysis_id_for(["case-a"])),
+                         "绑定失败不得落任何 analysis 记录")
+
+    def test_hit_wrong_digest_rejected(self):
+        # 先正确回灌一次，令 cache 变热
+        p1 = analyze(case_ids=["case-a"],
+                     llm_fn=self._fn({"operation": "analysis", "input_digest": "right",
+                                      "result": VALID_ANALYSIS}, "analysis", "right"),
+                     deps=self.deps)
+        self.assertFalse(p1.get("reused"))
+        # 再提交错误 digest：即使 cache 已热，也必须拒绝（preflight 先于 cache）
+        with self.assertRaises(ResultBindingError):
+            analyze(case_ids=["case-a"],
+                    llm_fn=self._fn({"operation": "analysis", "input_digest": "wrong",
+                                     "result": VALID_ANALYSIS}, "analysis", "right"),
+                    deps=self.deps)
+
+    def test_hit_wrong_operation_rejected(self):
+        analyze(case_ids=["case-a"],
+                llm_fn=self._fn({"operation": "analysis", "input_digest": "d",
+                                 "result": VALID_ANALYSIS}, "analysis", "d"),
+                deps=self.deps)
+        with self.assertRaises(ResultBindingError):
+            analyze(case_ids=["case-a"],
+                    llm_fn=self._fn({"operation": "write", "input_digest": "d",
+                                     "result": VALID_ANALYSIS}, "analysis", "d"),
+                    deps=self.deps)
 
 
 if __name__ == "__main__":
