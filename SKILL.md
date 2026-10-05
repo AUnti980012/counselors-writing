@@ -6,7 +6,7 @@ compatibility: "需要 Python 3.10+ + pydantic>=2（可选 readability-lxml + ht
 metadata:
   audience: 高校辅导员
   display_name: "Counselors-Writing"
-  version: "2.2.0"
+  version: "3.0.0"
 ---
 
 # Counselors-Writing（辅导员爆款文章）

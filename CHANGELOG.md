@@ -2,6 +2,36 @@
 
 本仓库按 `docs/history/milestone-pack-v1.0.md` 的 M0→M9 协议演进。里程碑细节见 `docs/history/migration-plan.md`。
 
+## [3.0.0] - 2026-10-05
+
+正式版（GA）发布。结束灰度，P3 最终收口 + Release Gate 通过。
+
+### 版本号（四种语义分离）
+
+| 版本 | 值 | 含义 |
+|---|---|---|
+| Skill | **3.0.0** | 正式版（GA）；audited output 走 `--audit` 血缘 |
+| KB | **1.0.0** | CLI 接口正式稳定（P3-3 binding-before-cache + P3-1 schema_summary 约束）|
+| Schema | 1.1.0（不变） | 数据契约零漂移 |
+| DB | 3（不变） | 无 migration |
+
+### P3 Final Fix
+
+- **P3-1**：`schema_summary` 暴露 enum / minimum / maximum / required / array item / 一层 `$ref`，不复制完整 JSON Schema（`topic` 摘要 < 1500 字符），提升 Agent 首次结构化生成通过率。
+- **P3-2**：`output render --draft <id> --audit <audit_id>` 写入 final_output 血缘；SKILL/README/docs 文档与代码一致。
+- **P3-3**：`--result` 绑定校验（operation/input_digest）经 `preflight_binding` 钩子在 Cache Lookup **之前**执行；Cache HIT 无法绕过 binding validation。7 个 Gate 全部 PASS。
+- **P3-4**：Physical LLM Invocation 统计口径固化（Retry 不重复计数、MCP/脚本/校验不计入、Actual vs Estimated token 区分）。
+
+### Release Gate
+
+- 全量回归 **500/500**、schema **18/18** 零漂移。
+- 干净环境初始化、CLI 契约、缓存/绑定安全、legacy `--result` 兼容、文档一致性、仓库卫生全部通过。
+- GitHub 灰度 release：commit `b2119fc`（P3 修复）→ push → fresh clone 验证通过。
+
+### 测试
+
+- 全量 500（原 487 → +13：P3-1 约束 8 + P3-3 binding 5）。
+
 ## [2.2.0] - 2026-10-04
 
 M10.1 最终运行时加固 + M10.2 通用内容写作（Gray Release）：系统从「案例驱动写作」扩展为「案例驱动 + 通用校园内容」双入口，并修复灰度测试发现的三个问题（P2-1 / P2-2→P1 / P3-1）。

@@ -51,7 +51,7 @@ except ImportError as exc:  # 依赖缺失（pydantic 未安装）
     print("安装指引：python -m pip install 'pydantic>=2'", file=sys.stderr)
     sys.exit(EXIT_DEPENDENCY)
 
-KB_VERSION = "0.12.0"  # M10.2：通用写作（write --topic 无 mapping）+ schema_summary 嵌套 $ref + audit mode 措辞
+KB_VERSION = "1.0.0"  # 正式版（GA）：P3 收口（binding-before-cache + schema_summary 约束 + --audit lineage）
 
 ENTITY_NAMES = sorted(ENTITIES)
 
