@@ -32,7 +32,7 @@
   "description": "传播效果/复盘契约：V1 案例 16 字段里的 effect/retro 独立成表，不回写 Case。",
   "properties": {
     "schema_version": {
-      "default": "1.1.0",
+      "default": "1.2.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

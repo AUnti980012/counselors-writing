@@ -41,10 +41,9 @@
 - [ ] 标题和结构是否明显抄袭某篇已知爆款
 
 ### 7. AI 痕迹
-- [ ] 有无「首先/其次/最后」「总而言之」「值得一提的是」等模板连接词
 - [ ] 有无排比堆砌、空洞升华、每段结尾强行点题
 - [ ] 语言是否像真人辅导员在和学生说话
-- [ ] 有无 em-dash（—/–）、半角标点、中英混排（配合标点门禁 `kb.py punctuation`）
+- [ ] 机械项（模板连接词 / 套话收尾 / 进行+动词 / 限定词堆叠 / emoji / em-dash / 半角标点）由确定性门禁 `kb.py deai` + `kb.py punctuation` 兜底（零 LLM，见 `references/de-ai.md`）
 
 ## 二、结论与处理
 
@@ -63,6 +62,10 @@ python scripts/kb.py audit --draft <draft_id> --result 审核结果.json
 
 # 标点门禁可独立跑（exit 0 通过 / 2 有 findings 或 ko 暂不支持）
 python scripts/kb.py punctuation <正文文件>
+
+# 去 AI 味门禁可独立跑（exit 0 通过 / 2 有 findings）
+python scripts/kb.py deai <正文文件>
+python scripts/kb.py deai --fix <正文文件>
 ```
 
 verdict 硬规则（代码级强制）：political / factual / privacy 任一 `fail` → `AuditRecord.passed=false`；任一检查分组未通过 → `passed=false`。审核输出为机器可读 `AuditRecord`（`data/schemas/audit.schema.json`）。

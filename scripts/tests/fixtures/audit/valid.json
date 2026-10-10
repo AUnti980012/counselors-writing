@@ -4,10 +4,59 @@
   "draft_id": "drf-demo-0001",
   "issues": [
     {
+      "check": "political",
+      "verdict": "pass",
+      "note": "政治方向正确。",
+      "location": "",
+      "evidence_ids": []
+    },
+    {
+      "check": "factual",
+      "verdict": "pass",
+      "note": "事实可核实。",
+      "location": "",
+      "evidence_ids": []
+    },
+    {
+      "check": "value",
+      "verdict": "pass",
+      "note": "价值表达自然。",
+      "location": "",
+      "evidence_ids": []
+    },
+    {
+      "check": "labeling",
+      "verdict": "pass",
+      "note": "无标签化语言。",
+      "location": "",
+      "evidence_ids": []
+    },
+    {
       "check": "ai_trace",
       "verdict": "warn",
       "note": "第二段出现「首先、其次、最后」模板化连接词，建议替换。",
       "location": "第二段",
+      "evidence_ids": []
+    },
+    {
+      "check": "privacy",
+      "verdict": "pass",
+      "note": "无隐私问题。",
+      "location": "",
+      "evidence_ids": []
+    },
+    {
+      "check": "copyright",
+      "verdict": "pass",
+      "note": "无版权风险。",
+      "location": "",
+      "evidence_ids": []
+    },
+    {
+      "check": "format",
+      "verdict": "pass",
+      "note": "格式合规。",
+      "location": "",
       "evidence_ids": []
     },
     {

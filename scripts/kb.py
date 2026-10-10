@@ -22,6 +22,7 @@
   write --mapping <id>             LLM 写作→DraftRecord（白名单输入，三模式）
   audit --draft <id>               LLM 七项自查+标点门禁→AuditRecord（单通道，C-07；三模式）
   punctuation [FILE]              标点门禁（确定性，零 LLM；C-03/C-09）
+  deai [FILE] [--fix]             去 AI 味门禁（确定性，零 LLM；Humanizer-zh 机械子集）
   output render --draft <id>       draft→最终 Markdown→FINAL artifact（零 LLM，换格式重渲染）
   task create/status/transition/resume/retry/events/batch   16 态任务状态机（非法迁移拒绝）
   backup create/list/restore      索引库在线快照→data/backups/（恢复前 integrity_check+安全副本）
@@ -51,7 +52,7 @@ except ImportError as exc:  # 依赖缺失（pydantic 未安装）
     print("安装指引：python -m pip install 'pydantic>=2'", file=sys.stderr)
     sys.exit(EXIT_DEPENDENCY)
 
-KB_VERSION = "1.0.0"  # 正式版（GA）：P3 收口（binding-before-cache + schema_summary 约束 + --audit lineage）
+KB_VERSION = "1.1.0"  # 3.1：新增 deai 去 AI 味门禁（零 LLM）+ audit deai 注入 + schema 1.2.0
 
 ENTITY_NAMES = sorted(ENTITIES)
 
@@ -950,7 +951,7 @@ def cmd_write(args):
 def cmd_audit(args):
     """LLM 七项自查 + 标点门禁 → AuditRecord（单通道，C-07；三模式）。"""
     from core.audit import (AuditInputError, _draft_fulltext, audit,
-                            build_audit_prompt)
+                            build_audit_grounding, build_audit_prompt)
     from core.extract import LLMCallError, ResultBindingError, default_extraction_deps
 
     input_digest = _request_digest("audit", args.draft, args.model_mode)
@@ -967,9 +968,10 @@ def cmd_audit(args):
                                      "model_mode": args.model_mode},
                          "input_digest": input_digest,
                          "expected_output": "audit",
-                         "prompt": build_audit_prompt(_draft_fulltext(draft),
-                                                      draft.title, args.model_mode,
-                                                      mode=getattr(draft, "mode", "article") or "article")})
+                         "prompt": build_audit_prompt(
+                             _draft_fulltext(draft), draft.title, args.model_mode,
+                             mode=getattr(draft, "mode", "article") or "article",
+                             grounding=build_audit_grounding(repo, draft))})
             return EXIT_OK
         finally:
             conn.close()
@@ -1034,6 +1036,28 @@ def cmd_punctuation(args):
         return EXIT_OK
 
     result = check_text(text, lang=lang, max_findings=args.max_findings)
+    _print_json(result)
+    return EXIT_INVALID if result["total"] > 0 else EXIT_OK
+
+
+def cmd_deai(args):
+    """去 AI 味门禁（确定性，零 LLM）。exit 0 通过 / 2 有 findings。"""
+    from core.deai import check_text, fix_text
+
+    if args.file:
+        try:
+            text = open(args.file, encoding="utf-8", errors="replace", newline="").read()
+        except OSError as exc:
+            print(f"错误：无法读取 {args.file!r}：{exc.strerror or exc}", file=sys.stderr)
+            return EXIT_ERROR
+    else:
+        text = sys.stdin.buffer.read().decode("utf-8", "replace")
+
+    if args.fix:
+        sys.stdout.write(fix_text(text))
+        return EXIT_OK
+
+    result = check_text(text, max_findings=args.max_findings)
     _print_json(result)
     return EXIT_INVALID if result["total"] > 0 else EXIT_OK
 
@@ -1456,6 +1480,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_punct.add_argument("--max-findings", type=int, default=None,
                          help="findings 输出上限（防逐行无上限）")
     p_punct.set_defaults(func=cmd_punctuation)
+
+    p_deai = sub.add_parser("deai", help="去 AI 味门禁（确定性，零 LLM）")
+    p_deai.add_argument("file", nargs="?", help="待检查文件（默认 stdin）")
+    p_deai.add_argument("--fix", action="store_true", help="输出 AUTO_FIX 后的文本")
+    p_deai.add_argument("--max-findings", type=int, default=None,
+                        help="findings 输出上限（防逐行无上限）")
+    p_deai.set_defaults(func=cmd_deai)
 
     p_out = sub.add_parser("output", help="最终输出渲染（零 LLM）")
     p_out_sub = p_out.add_subparsers(dest="sub", required=True)

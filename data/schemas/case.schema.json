@@ -93,7 +93,7 @@
   "description": "案例知识契约（辅导员工作案例）。\n\n红线：不混装传播效果/反馈/复盘字段（→ EffectRecord）；\n事实与推断强制分离（documented_facts / source_claims vs ai_inferences）。",
   "properties": {
     "schema_version": {
-      "default": "1.1.0",
+      "default": "1.2.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

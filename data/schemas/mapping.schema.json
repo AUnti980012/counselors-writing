@@ -110,7 +110,7 @@
   "description": "案例 × 学校画像映射契约：外部成功案例 ≠ 本地可直接套用。",
   "properties": {
     "schema_version": {
-      "default": "1.1.0",
+      "default": "1.2.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

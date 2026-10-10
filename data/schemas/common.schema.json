@@ -690,7 +690,8 @@
             "privacy",
             "copyright",
             "punctuation",
-            "format"
+            "format",
+            "deai"
           ],
           "title": "Check",
           "type": "string"
@@ -1080,7 +1081,8 @@
       "privacy",
       "copyright",
       "punctuation",
-      "format"
+      "format",
+      "deai"
     ],
     "title_type": [
       "suspense",

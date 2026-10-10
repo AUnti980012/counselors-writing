@@ -3,7 +3,7 @@
   "description": "分块契约：≤2000 字符内联 + 位置信息（M3 落盘，M2 建索引）。",
   "properties": {
     "schema_version": {
-      "default": "1.1.0",
+      "default": "1.2.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

@@ -10,10 +10,12 @@
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import Any, Dict, Optional
 
 from core.extract import ExtractionDeps, default_extraction_deps
+from core.preprocess import count_words
 from core.schema import SCHEMA_VERSION
 
 # 占位符（{title}/{subtitle}/{sections}/{closing}），编译一次复用
@@ -74,6 +76,8 @@ def finalize(*, draft_id: str, deps: ExtractionDeps = None,
     """渲染 draft 为最终文档并落 FINAL artifact（permanent，零 LLM）。
 
     同 draft + 同模板 → 同渲染文本 → artifact 幂等复用（content_hash 幂等）。
+    交付统计（char_count/word_count/content_hash）一律基于**最终渲染文件**计算，
+    不得沿用 draft.word_count（初稿口径，不含标题/落款/markdown）。
     返回小型指针（正文不进输出）。
     """
     deps = deps or default_extraction_deps()
@@ -82,21 +86,40 @@ def finalize(*, draft_id: str, deps: ExtractionDeps = None,
         raise OutputInputError(f"draft 不存在：{draft_id}（先 kb.py write 产出草稿）")
 
     rendered = render_draft(draft, template)
+    rendered_bytes = rendered.encode("utf-8")
+    content_hash = hashlib.sha256(rendered_bytes).hexdigest()
+    char_count = len(rendered.rstrip("\n"))     # 含标点全字符（不含末尾换行）
+    word_count = count_words(rendered)          # 字数（CJK 字 + 拉丁词，不含标点）
+
     metadata = {"draft_id": draft_id, "schema_version": SCHEMA_VERSION}
     if audit_id:
         metadata["audit_id"] = audit_id
 
     rec, reused = deps.store.create(
-        "final_output", rendered.encode("utf-8"),
+        "final_output", rendered_bytes,
         source_ids=draft.lineage.source_ids,
         retention="permanent",
         summary=f"最终输出 → {draft_id}",
         metadata=metadata)
+
+    # 交付一致性校验：落盘 artifact 的内容哈希必须与本次渲染一致，不一致即报告失败
+    if rec.content_hash != content_hash:
+        return {
+            "status": "failed", "entity": "final_output",
+            "artifact_id": rec.artifact_id, "draft_id": draft_id,
+            "audit_id": audit_id, "reused": reused,
+            "schema_version": SCHEMA_VERSION,
+            "reason": "最终文件内容哈希与本次渲染不一致（交付链路异常）",
+            "content_hash": content_hash, "registered_content_hash": rec.content_hash,
+            "char_count": char_count, "word_count": word_count,
+        }
 
     return {
         "status": "success", "entity": "final_output",
         "artifact_id": rec.artifact_id, "draft_id": draft_id,
         "audit_id": audit_id, "reused": reused,
         "schema_version": SCHEMA_VERSION,
+        "content_hash": content_hash, "char_count": char_count,
+        "word_count": word_count, "path": rec.path,
         "lineage": draft.lineage.model_dump(mode="json"),
     }

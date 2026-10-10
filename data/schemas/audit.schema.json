@@ -14,7 +14,8 @@
             "privacy",
             "copyright",
             "punctuation",
-            "format"
+            "format",
+            "deai"
           ],
           "title": "Check",
           "type": "string"
@@ -81,7 +82,7 @@
   "description": "审核契约（单通道：七项结构化自查 + 标点门禁；无第二意见列）。\n\n分组映射：fact_check=[political, factual]；style_check=[value, labeling, ai_trace]；\nformat_check=[punctuation, format]；risk_check=[privacy, copyright]。\nverdict 硬规则：political/factual/privacy 任一 fail → passed 必须为 false。",
   "properties": {
     "schema_version": {
-      "default": "1.1.0",
+      "default": "1.2.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

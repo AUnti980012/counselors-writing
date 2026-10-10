@@ -1,6 +1,6 @@
 # Storage Architecture（存储架构）
 
-> pack M2 STEP 10 交付物（M6 起持续更新）。对应实现：`scripts/core/{atomic,artifact,cache,db,repo,search,hashing,urlutil,fetcher,preprocess,chunker,pipeline,hotlist,compat,extract,analysis,mapping,profile,writer,audit,punctuation,output}.py`。
+> pack M2 STEP 10 交付物（M6 起持续更新）。对应实现：`scripts/core/{atomic,artifact,cache,db,repo,search,hashing,urlutil,fetcher,preprocess,chunker,pipeline,hotlist,compat,extract,analysis,mapping,profile,writer,audit,punctuation,deai,output}.py`。
 > 与 `docs/architecture/data-contract.md` 的分工：本文件讲「存储怎么实现」；data-contract 讲「数据怎么定义」。
 
 ## 1. 总览（四层存储）
@@ -264,20 +264,22 @@ kb.py profile get <key> / set <key> <value> / dump
 
 ## 17. 写作 + 审核 + 输出管道（M6）
 
-`mapping → 白名单上下文包 → LLM 写作 → DraftRecord → 七项审核 + 标点门禁 → AuditRecord → 渲染 → FINAL artifact`（`core/writer.py` + `core/audit.py` + `core/punctuation.py` + `core/output.py` 编排）：
+`mapping → 白名单上下文包 → LLM 写作 → DraftRecord → 七项审核 + 标点/去AI 门禁 → AuditRecord → 渲染 → FINAL artifact`（`core/writer.py` + `core/audit.py` + `core/punctuation.py` + `core/deai.py` + `core/output.py` 编排）：
 
 ```
 kb.py context-for-write --mapping <id>    白名单审计输出（Token 检查点 E：<6K）
 kb.py write --mapping <id> --llm-cmd ...  LLM 写作 → DraftRecord（articles/ canonical + draft artifact）
-kb.py audit --draft <id> --llm-cmd ...    LLM 七项自查 + 标点门禁 → AuditRecord（audits/ + audit artifact）
+kb.py audit --draft <id> --llm-cmd ...    LLM 七项自查 + 标点/去AI 门禁 → AuditRecord（audits/ + audit artifact）
 kb.py punctuation <file>                   标点门禁（确定性，零 LLM；C-03/C-09）
+kb.py deai <file> [--fix]                  去 AI 味门禁（确定性，零 LLM；Humanizer-zh 机械子集）
 kb.py output render --draft <id> --audit <audit_id>   draft → FINAL artifact（permanent，零 LLM；--audit 写入血缘 metadata）
 ```
 
 - **写作白名单**（pack M6 STEP 1 / G-18）：writer 代码级只注入批准的 topic/case/analysis/mapping/style/profile（结构化投影，字段级截断）；deny 清单（raw HTML/完整原文/整库/历史）不进上下文；lineage 由 Python 从输入聚合（case_ids/source_ids/evidence_ids 去重）——每个主要事实性断言可追溯。
 - **draft 存储**：canonical-only（无索引表，落在 `data/knowledge/articles/`），DRAFT artifact 记账；draft_id = sha256(mapping_id+mode+model_mode) 幂等覆盖；cache（tasks 命名空间 `analysis:writing:` 前缀）含内容哈希，编辑后 miss 重跑。
-- **审核单通道**（C-07）：七项（political/factual/value/labeling/ai_trace/privacy/copyright/format）由 LLM 填 issues，标点（punctuation）由 Python 确定性注入；分组聚合 fact/style/format/risk；verdict 硬规则 political/factual/privacy 任一 fail → passed=false（代码级强制，schema `_verdict_rule`）。
+- **审核单通道**（C-07）：七项（political/factual/value/labeling/ai_trace/privacy/copyright/format）由 LLM 填 issues，标点（punctuation）与去 AI（deai）由 Python 确定性注入（零 LLM）；分组聚合 fact/style/format/risk；verdict 硬规则 political/factual/privacy 任一 fail → passed=false（代码级强制，schema `_verdict_rule`）。
 - **标点门禁**（`core/punctuation.py`）：迁自 check_punctuation.py；C-09 三规则修复（数字+CJK 不强制空格、em-dash 仅 zh 禁用、全角空格只报 CJK↔半角之间）+ C-03 ko exit 2 + `--max-findings` 截断；legacy `scripts/check_punctuation.py` 薄封装透传 `cli_main`。
+- **去 AI 味门禁**（`core/deai.py`）：Humanizer-zh 31 模式机械子集规则化（AUTO_FIX 连接词/套话/进行+动词/限定词堆叠/emoji + FLAG_ONLY 高频词/拔高/客服腔等）；复用 punctuation 的豁免逻辑并跳过 YAML frontmatter；零 LLM。
 - **输出**：纯字符串占位符渲染（`{title}/{subtitle}/{sections}/{closing}`，无模板引擎）；FINAL artifact（`final_output`，permanent）；换格式重渲染 = 读 draft 重新渲染，零 LLM。
 - **Token 检查点 E/F**：E（写作上下文 <6K）——白名单投影 + 总预算 9600 字符 + cache 零 LLM；F（思政降 ≥50%）——第二意见删除后全文单传 + 标点门禁零 LLM。
 

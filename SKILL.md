@@ -6,7 +6,7 @@ compatibility: "需要 Python 3.10+ + pydantic>=2（可选 readability-lxml + ht
 metadata:
   audience: 高校辅导员
   display_name: "Counselors-Writing"
-  version: "3.0.0"
+  version: "3.2.0"
 ---
 
 # Counselors-Writing（辅导员爆款文章）
@@ -48,7 +48,7 @@ metadata:
 
 ### 两条路径共同收口
 
-6. **过门**：`kb.py punctuation --lang zh <正文>`（零 LLM）+ `kb.py audit --draft <id>`（七项自查，按 draft.mode 措辞）。
+6. **过门**：`kb.py punctuation --lang zh <正文>` + `kb.py deai <正文>`（零 LLM 确定性门禁）+ `kb.py audit --draft <id>`（七项自查，按 draft.mode 措辞）。
 7. **交付**：`kb.py output render --draft <id> --audit <audit_id>`（`--audit` 把审核 id 写进 final_output 血缘，audited output 应带；换格式重渲染可省略）。
 8. **复盘沉淀**：`kb.py case add` / `kb.py style add`（不阻塞交付）。
 

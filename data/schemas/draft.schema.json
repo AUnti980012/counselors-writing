@@ -175,7 +175,7 @@
   "description": "正文草稿契约：白名单血缘（lineage）+ 逐条可追溯断言（claims）。",
   "properties": {
     "schema_version": {
-      "default": "1.1.0",
+      "default": "1.2.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

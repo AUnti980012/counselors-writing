@@ -62,6 +62,8 @@ python scripts/kb.py write --mapping <mapping_id> --llm-cmd "<你的 LLM 命令>
 ```bash
 # 标点门禁（确定性，零 LLM）
 python scripts/kb.py punctuation --lang zh 正文.md
+# 去 AI 味门禁（确定性，零 LLM；--fix 输出自动修后的文本）
+python scripts/kb.py deai 正文.md
 # 单通道七项思政自查
 python scripts/kb.py audit --draft <draft_id> --llm-cmd "<你的 LLM 命令>"
 ```

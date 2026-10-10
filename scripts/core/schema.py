@@ -22,7 +22,7 @@ from typing import Annotated, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 
 # ---- 模式常量 ----
 ID_PATTERN = r"^[a-z0-9][a-z0-9_-]{2,63}$"
@@ -72,7 +72,10 @@ TOPIC_STATUS = Literal["draft", "confirmed", "used", "abandoned"]
 SCHOOL_TYPE = Literal["university", "college", "vocational", "high_school", "other"]
 STYLE_ORIGIN = Literal["seed", "user"]
 AUDIT_CHECK = Literal["political", "factual", "value", "labeling", "ai_trace", "privacy",
-                      "copyright", "punctuation", "format"]
+                      "copyright", "punctuation", "format", "deai"]
+# 八项 LLM 自查（punctuation/deai 由 Python 确定性注入，不在其中）
+AUDIT_LLM_CHECKS = ["political", "factual", "value", "labeling", "ai_trace",
+                    "privacy", "copyright", "format"]
 TITLE_TYPE = Literal["suspense", "question", "story"]
 REF_KIND = Literal["task", "artifact", "source", "document", "chunk", "case", "style", "topic",
                    "analysis", "mapping", "profile", "audit", "effect", "draft", "evidence"]
@@ -699,6 +702,40 @@ class CheckGroup(BaseModel):
     notes: str = Field(default="", max_length=1000)
 
 
+def _issue_check_name(i) -> Optional[str]:
+    """审计 issue 的 check 名（dict 或 AuditIssue 对象均可）。"""
+    if isinstance(i, dict):
+        return i.get("check")
+    return getattr(i, "check", None)
+
+
+def audit_completeness_violations(issues) -> List[str]:
+    """审核完整性检测（确定性）：八项 LLM 自查必须齐全且唯一，不得出现未知项。
+
+    punctuation/deai 由 Python 确定性注入，不属于「LLM 自查」集合，允许存在
+    （且不应重复）。非法 verdict 由 AUDIT_CHECK / VERDICT 枚举在 Pydantic 层兜底。
+    接受 dict 或 AuditIssue 对象，返回违规描述列表（空列表 = 完整且合法）。
+    """
+    counts: Dict[str, int] = {}
+    for i in issues:
+        name = _issue_check_name(i)
+        if name is None:
+            continue
+        counts[name] = counts.get(name, 0) + 1
+    allowed = set(AUDIT_CHECK.__args__)
+    violations: List[str] = []
+    missing = [c for c in AUDIT_LLM_CHECKS if counts.get(c, 0) == 0]
+    if missing:
+        violations.append("缺失审核项：" + "、".join(missing))
+    dups = [c for c, n in counts.items() if n > 1]
+    if dups:
+        violations.append("重复审核项：" + "、".join(dups))
+    unknown = [c for c in counts if c not in allowed]
+    if unknown:
+        violations.append("未知审核项：" + "、".join(unknown))
+    return violations
+
+
 class AuditRecord(StampedRecord):
     """审核契约（单通道：七项结构化自查 + 标点门禁；无第二意见列）。
 
@@ -725,6 +762,20 @@ class AuditRecord(StampedRecord):
         groups = (self.fact_check, self.style_check, self.format_check, self.risk_check)
         if not all(g.passed for g in groups) and self.passed:
             raise ValueError("存在未通过的检查分组，passed 必须为 false")
+        return self
+
+    @model_validator(mode="after")
+    def _completeness_rule(self) -> "AuditRecord":
+        """八项 LLM 自查必须齐全且唯一（防 LLM 漏报/重复导致 fail-open 假通过）。
+
+        空 issues 跳过：仅 V1 迁移/无结构化自查的审计记录会出现（真实 audit 流程
+        至少注入 punctuation/deai，永不空），此类记录无 LLM 审核可完整性校验。
+        """
+        if not self.issues:
+            return self
+        violations = audit_completeness_violations(self.issues)
+        if violations:
+            raise ValueError("审核不完整：" + "；".join(violations))
         return self
 
 
@@ -929,7 +980,7 @@ ENUM_VALUES: Dict[str, List[str]] = {
     "topic_status": ["draft", "confirmed", "used", "abandoned"],
     "school_type": ["university", "college", "vocational", "high_school", "other"],
     "style_origin": ["seed", "user"],
-    "audit_check": ["political", "factual", "value", "labeling", "ai_trace", "privacy", "copyright", "punctuation", "format"],
+    "audit_check": ["political", "factual", "value", "labeling", "ai_trace", "privacy", "copyright", "punctuation", "format", "deai"],
     "title_type": ["suspense", "question", "story"],
     "ref_kind": REF_KINDS,
 }

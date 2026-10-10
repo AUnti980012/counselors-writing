@@ -45,7 +45,7 @@
       "description": "风格知识契约：只描述写作/传播特征，不存储整篇文章。",
       "properties": {
         "schema_version": {
-          "default": "1.1.0",
+          "default": "1.2.0",
           "description": "契约版本；变更契约时按语义化版本递增",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
           "title": "Schema Version",
@@ -209,7 +209,7 @@
   "description": "data/knowledge/styles/seed.json 的文件信封（种子随交付固化，origin 一律 seed）。\n\n导出为独立文件 data/schemas/seed.schema.json：其 entries 项的 StyleRecord\n定义内联进该文件自己的 $defs（StyleRecord 是实体模型，不在 common 共享区），\n避免 common.json 出现指向实体模型的悬空引用。",
   "properties": {
     "schema_version": {
-      "default": "1.1.0",
+      "default": "1.2.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",

@@ -93,6 +93,30 @@ class OutputTests(unittest.TestCase):
                       "标题里的字面 {sections} 不得被替换成正文")
         self.assertIn("正文内容。", text)
 
+    # ---- 加固回归：最终文件与交付统计一致性（P1-2） ----
+
+    def test_finalize_reports_final_file_stats(self):
+        """交付统计基于最终渲染文件（非 draft.word_count）：char/word/content_hash 一致。"""
+        import hashlib
+        from core.preprocess import count_words
+        rendered = render_draft(DRAFT)
+        ptr = finalize(draft_id="drf-out", deps=self.deps)
+        self.assertEqual(ptr["status"], "success")
+        self.assertEqual(ptr["char_count"], len(rendered.rstrip("\n")))
+        self.assertEqual(ptr["word_count"], count_words(rendered))
+        self.assertEqual(ptr["content_hash"],
+                         hashlib.sha256(rendered.encode("utf-8")).hexdigest())
+        rec = self.store.get(ptr["artifact_id"])
+        self.assertEqual(ptr["content_hash"], rec.content_hash,
+                         "指针哈希必须与 artifact 注册哈希一致")
+
+    def test_finalize_stats_based_on_final_file(self):
+        """最终文件统计包含标题/落款/markdown，规模大于 draft 的 section 内容字数。"""
+        ptr = finalize(draft_id="drf-out", deps=self.deps)
+        draft = self.repo.get_draft("drf-out")
+        self.assertGreater(ptr["char_count"], draft.word_count,
+                           "最终文件字数必须含标题/落款/markdown，不得沿用初稿 section 字数")
+
 
 if __name__ == "__main__":
     unittest.main()

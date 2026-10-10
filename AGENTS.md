@@ -8,8 +8,9 @@
 - M10 产品化收口（Agent Adapter Contract：`--result` 回灌 + docs 分层）已落地。
 - M10.1 最终运行时加固已落地：`--result` 误回灌保护（绑定 wrapper）、SQLite 连接生命周期修复、Audit 全文规则澄清、Retro 增量触发。
 - M10.2 通用内容写作已落地：`write --topic`（无 mapping 的 Generic 路径）+ schema_summary 嵌套 $ref 展开 + audit mode 措辞。能力模型 = Case-based（Case→optional Analysis→Mapping→Writing）+ Generic（Topic→Sources→Writing），共同收口 Punctuation→Audit→Output。
-- 版本：Skill `3.0.0` / KB `1.0.0` / Schema `1.1.0` / DB `3`。
-- **状态：正式版（GA）已发布，灰度结束。不再做大规模架构施工。**
+- M11 去 AI 味确定性门禁已落地：`kb.py deai`（零 LLM，Humanizer-zh 31 模式机械子集规则化）+ audit 注入 `deai` 检查项。
+- 版本：Skill `3.2.0` / KB `1.2.0` / Schema `1.2.0` / DB `3`。
+- **状态：3.2.0 Beta 版（成稿审核与事实校验加固）。**
 
 ## 2. 单一真相源
 

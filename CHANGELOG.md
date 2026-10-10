@@ -2,6 +2,53 @@
 
 本仓库按 `docs/history/milestone-pack-v1.0.md` 的 M0→M9 协议演进。里程碑细节见 `docs/history/migration-plan.md`。
 
+## [3.2.0] - 2026-10-10
+
+成稿审核与事实校验加固（Beta）。修复「深圳社保补缴」案例暴露的审核缺项、事实证据不足、选题风险未贯穿、交付统计不一致问题。
+
+### 版本号
+
+| 版本 | 值 | 含义 |
+|---|---|---|
+| Skill | **3.2.0** | 审核完整性门禁 + 事实 grounding + 内容契约 + 交付统计（用户可见行为） |
+| KB | **1.2.0** | `audit` 事实核验上下文携带来源正文片段（行为变化，CLI 接口不变） |
+| Schema | 1.2.0（不变） | 无契约变更（`_completeness_rule` 为 model_validator，不改 JSON Schema） |
+| DB | 3（不变） | 无 migration |
+
+### 变更
+
+- **审核完整性（P0）**：`AuditRecord._completeness_rule` + `audit_completeness_violations`——八项 LLM 自查必须齐全且唯一，缺失/重复/未知检查项 → 校验失败，杜绝 fail-open 假通过。
+- **事实 grounding**：`build_audit_grounding` 把选题 `risks`、来源核验状态、证据摘录、有界来源正文片段（≤400 字、PII 脱敏）注入审核 prompt，让 `factual` 检查有据可依，不再纯语言判断。
+- **事实 gate（确定性）**：选题已标事实风险且无权威证据时，`factual=pass` 降级 `fail`，防止「仅凭 LLM 语言判断放行」。
+- **内容契约**：审核 `format` 指令新增「标题核心问题是否在正文得到回答 / 标题承诺与正文一致性」。
+- **交付统计**：`finalize()` 返回基于最终渲染文件的 `char_count` / `word_count` / `content_hash`，不再沿用 draft.word_count（初稿口径）。
+- 修复：grounding 仅传 evidence excerpt 导致审核 LLM 反复误判「超来源」——改为携带来源正文片段后 factual 误判消除。
+
+### 测试
+
+- 全量 **536**（535 → +1：grounding 正文片段回归锁等）。
+- `kb.py schemas export --check` 零漂移。
+
+## [3.1.0] - 2026-10-10
+
+去 AI 味确定性门禁（零 LLM）。
+
+### 版本号
+
+| 版本 | 值 | 含义 |
+|---|---|---|
+| Skill | **3.1.0** | 新增去 AI 味门禁 `kb.py deai`（用户可见行为） |
+| KB | **1.1.0** | 新增 `deai` 子命令（CLI 接口） |
+| Schema | **1.2.0** | `AUDIT_CHECK` 枚举新增 `deai` |
+| DB | 3（不变） | 无 migration |
+
+### 变更
+
+- 新增 `scripts/core/deai.py`：Humanizer-zh 31 条模式的机械子集规则化（AUTO_FIX + FLAG_ONLY），零 LLM。
+- `kb.py deai`：检查 + `--fix` 自动修（连接词/套话/进行+动词/限定词堆叠/emoji）。
+- `audit`：注入确定性 `deai` 检查项（与 punctuation 并列，verdict=warn 非致命）；`ai_trace` LLM 清单去机械子项（省 token）。
+- 文档：`references/de-ai.md` 重写为「确定性门禁 + 判断清单」，删除断链的兄弟 skill 引用。
+
 ## [3.0.0] - 2026-10-05
 
 正式版（GA）发布。结束灰度，P3 最终收口 + Release Gate 通过。

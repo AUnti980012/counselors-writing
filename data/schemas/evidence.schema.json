@@ -3,7 +3,7 @@
   "description": "证据契约：独立记录，三级回指（artifact/document/chunk/source 至少其一）。\n\nexcerpt 为有界摘录（≤500 字符），禁止把整篇文章复制为「证据」。\nGC 引用检查以本表为事实/推断的引用来源之一（M7）。",
   "properties": {
     "schema_version": {
-      "default": "1.1.0",
+      "default": "1.2.0",
       "description": "契约版本；变更契约时按语义化版本递增",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "title": "Schema Version",
