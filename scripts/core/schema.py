@@ -81,6 +81,24 @@ REF_KIND = Literal["task", "artifact", "source", "document", "chunk", "case", "s
                    "analysis", "mapping", "profile", "audit", "effect", "draft", "evidence"]
 REF_KINDS = list(REF_KIND.__args__)  # 供 validator 使用
 
+# 热点内容风险筛查（/cw-hot 关卡）：审核状态 + 审核方式。
+# 与 AuditRecord.verdict（pass/warn/fail，文章级）粒度不同：这里是对单条热点的
+# 「是否可进入选题/写作」判定。未实际执行审核的记录不得标记为 approved。
+REVIEW_STATUS = Literal["approved", "caution", "needs_review", "rejected"]
+REVIEW_METHOD = Literal["deterministic", "llm", "deterministic_llm", "unreviewed"]
+
+# 已知风险类型标签（risk_flags 取值；确定性筛查产出的标准标签，LLM 可补充）
+RISK_FLAGS = [
+    "unverified_claim",       # 未经证实指控/传言/夸大标题
+    "sensitive_event",        # 死亡/伤害/灾难/暴力
+    "privacy_minor",          # 个人隐私/未成年人/未经证实身份
+    "politics_legal",         # 政治/法律/公共事件
+    "misleading_conclusion",  # 误导性健康/金融结论
+    "low_relevance",          # 与高校辅导员/大学生/校园目标受众相关性低
+    "stale",                  # 时效性不足
+    "insufficient_evidence",  # 证据基础不足
+]
+
 
 def _utcnow() -> datetime:
     """时间戳由 Python 托管（LLM 可省略，写入侧自动补齐）。"""
@@ -909,6 +927,57 @@ class EvidenceRecord(StampedRecord):
         return self
 
 
+# ---- 热点内容风险筛查（/cw-hot 关卡，独立于 AuditRecord 的文章级审核）----
+
+class HotReviewItem(BaseModel):
+    """单条热点的内容风险筛查结果。fetch_status（抓取成功）与 review_status
+    （实际筛查结论）强制分离：抓取成功绝不等于审核通过。"""
+
+    model_config = ConfigDict(extra="forbid")
+    hot_id: str = Field(min_length=4, max_length=64, description="热点稳定标识（hot-<12hex>）")
+    fetch_status: SOURCE_STATUS = Field(default="success", description="抓取是否成功（与审核状态分离）")
+    review_status: REVIEW_STATUS = Field(description="实际筛查结果")
+    risk_flags: List[str] = Field(default_factory=list, max_length=20, description="风险类型标签")
+    review_reason: str = Field(default="", max_length=1000, description="判定理由")
+    review_method: REVIEW_METHOD = Field(description="实际采用的审核方式")
+    reviewed_at: Optional[datetime] = Field(default=None, description="审核时间（未执行审核为 null）")
+    source_refs: List[str] = Field(default_factory=list, max_length=20,
+                                   description="来源平台名列表（如 weibo/tophub），溯源用")
+
+    @field_validator("reviewed_at")
+    @classmethod
+    def _aware(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is not None and v.tzinfo is None:
+            raise ValueError("reviewed_at 必须带时区")
+        return v
+
+
+class HotReviewRecord(BaseRecord):
+    """一次热点筛查运行的结果（独立、可追溯的处理结果，与原始快照分离存储）。
+
+    review_id 由被审核快照 items 的内容哈希稳定推导，用于复用检测：同快照复用
+    已有有效审核，快照内容变化则生成新 review_id，绝不覆盖旧审核。
+    """
+
+    review_id: IdStr = Field(description="推荐前缀 hrv-（按被审核快照内容哈希稳定）")
+    snapshot_artifact_id: Optional[IdStr] = Field(default=None, description="被审核的原始快照 artifact_id")
+    snapshot_content_hash: str = Field(default="", max_length=128,
+                                       description="被审核快照 items 的内容哈希（版本绑定，防过期复用）")
+    reviewed_at: datetime = Field(default_factory=_utcnow, description="本次筛查运行时间")
+    items: List[HotReviewItem] = Field(default_factory=list, max_length=200)
+    counts: Dict[str, int] = Field(default_factory=dict, max_length=20,
+                                   description="各审核状态计数")
+    semantic_review_executed: bool = Field(default=False, description="是否实际执行语义复核（LLM）")
+    semantic_review_failed: bool = Field(default=False, description="语义复核是否执行失败/不可用（与「通过」区分）")
+
+    @field_validator("reviewed_at")
+    @classmethod
+    def _aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("reviewed_at 必须带时区")
+        return v
+
+
 # ---- 注册表与导出 ----
 
 ENTITIES: Dict[str, type] = {
@@ -953,6 +1022,8 @@ COMMON_DEFS: Dict[str, type] = {
     "DocSection": DocSection,
     "MatchingPoint": MatchingPoint,
     "DifferenceItem": DifferenceItem,
+    "HotReviewItem": HotReviewItem,
+    "HotReviewRecord": HotReviewRecord,
 }
 
 # 独立导出的文件信封（引用实体模型，须自含 $defs，不能进 common 共享区）
@@ -983,6 +1054,9 @@ ENUM_VALUES: Dict[str, List[str]] = {
     "audit_check": ["political", "factual", "value", "labeling", "ai_trace", "privacy", "copyright", "punctuation", "format", "deai"],
     "title_type": ["suspense", "question", "story"],
     "ref_kind": REF_KINDS,
+    "review_status": ["approved", "caution", "needs_review", "rejected"],
+    "review_method": ["deterministic", "llm", "deterministic_llm", "unreviewed"],
+    "risk_flag": RISK_FLAGS,
 }
 
 JSON_SCHEMA_URI = "https://json-schema.org/draft/2020-12/schema"
