@@ -927,6 +927,280 @@
       ],
       "title": "DifferenceItem",
       "type": "object"
+    },
+    "HotReviewItem": {
+      "additionalProperties": false,
+      "description": "单条热点的内容风险筛查结果。fetch_status（抓取成功）与 review_status\n（实际筛查结论）强制分离：抓取成功绝不等于审核通过。",
+      "properties": {
+        "hot_id": {
+          "description": "热点稳定标识（hot-<12hex>）",
+          "maxLength": 64,
+          "minLength": 4,
+          "title": "Hot Id",
+          "type": "string"
+        },
+        "fetch_status": {
+          "default": "success",
+          "description": "抓取是否成功（与审核状态分离）",
+          "enum": [
+            "success",
+            "blocked",
+            "access_restricted",
+            "unavailable",
+            "timeout",
+            "rate_limited",
+            "parse_failed"
+          ],
+          "title": "Fetch Status",
+          "type": "string"
+        },
+        "review_status": {
+          "description": "实际筛查结果",
+          "enum": [
+            "approved",
+            "caution",
+            "needs_review",
+            "rejected"
+          ],
+          "title": "Review Status",
+          "type": "string"
+        },
+        "risk_flags": {
+          "description": "风险类型标签",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Risk Flags",
+          "type": "array"
+        },
+        "review_reason": {
+          "default": "",
+          "description": "判定理由",
+          "maxLength": 1000,
+          "title": "Review Reason",
+          "type": "string"
+        },
+        "review_method": {
+          "description": "实际采用的审核方式",
+          "enum": [
+            "deterministic",
+            "llm",
+            "deterministic_llm",
+            "unreviewed"
+          ],
+          "title": "Review Method",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "审核时间（未执行审核为 null）",
+          "title": "Reviewed At"
+        },
+        "source_refs": {
+          "description": "来源平台名列表（如 weibo/tophub），溯源用",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Source Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "hot_id",
+        "review_status",
+        "review_method"
+      ],
+      "title": "HotReviewItem",
+      "type": "object"
+    },
+    "HotReviewRecord": {
+      "$defs": {
+        "HotReviewItem": {
+          "additionalProperties": false,
+          "description": "单条热点的内容风险筛查结果。fetch_status（抓取成功）与 review_status\n（实际筛查结论）强制分离：抓取成功绝不等于审核通过。",
+          "properties": {
+            "hot_id": {
+              "description": "热点稳定标识（hot-<12hex>）",
+              "maxLength": 64,
+              "minLength": 4,
+              "title": "Hot Id",
+              "type": "string"
+            },
+            "fetch_status": {
+              "default": "success",
+              "description": "抓取是否成功（与审核状态分离）",
+              "enum": [
+                "success",
+                "blocked",
+                "access_restricted",
+                "unavailable",
+                "timeout",
+                "rate_limited",
+                "parse_failed"
+              ],
+              "title": "Fetch Status",
+              "type": "string"
+            },
+            "review_status": {
+              "description": "实际筛查结果",
+              "enum": [
+                "approved",
+                "caution",
+                "needs_review",
+                "rejected"
+              ],
+              "title": "Review Status",
+              "type": "string"
+            },
+            "risk_flags": {
+              "description": "风险类型标签",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "title": "Risk Flags",
+              "type": "array"
+            },
+            "review_reason": {
+              "default": "",
+              "description": "判定理由",
+              "maxLength": 1000,
+              "title": "Review Reason",
+              "type": "string"
+            },
+            "review_method": {
+              "description": "实际采用的审核方式",
+              "enum": [
+                "deterministic",
+                "llm",
+                "deterministic_llm",
+                "unreviewed"
+              ],
+              "title": "Review Method",
+              "type": "string"
+            },
+            "reviewed_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "审核时间（未执行审核为 null）",
+              "title": "Reviewed At"
+            },
+            "source_refs": {
+              "description": "来源平台名列表（如 weibo/tophub），溯源用",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "title": "Source Refs",
+              "type": "array"
+            }
+          },
+          "required": [
+            "hot_id",
+            "review_status",
+            "review_method"
+          ],
+          "title": "HotReviewItem",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "description": "一次热点筛查运行的结果（独立、可追溯的处理结果，与原始快照分离存储）。\n\nreview_id 由被审核快照 items 的内容哈希稳定推导，用于复用检测：同快照复用\n已有有效审核，快照内容变化则生成新 review_id，绝不覆盖旧审核。",
+      "properties": {
+        "schema_version": {
+          "default": "1.2.0",
+          "description": "契约版本；变更契约时按语义化版本递增",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "review_id": {
+          "description": "推荐前缀 hrv-（按被审核快照内容哈希稳定）",
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "title": "Review Id",
+          "type": "string"
+        },
+        "snapshot_artifact_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "被审核的原始快照 artifact_id",
+          "title": "Snapshot Artifact Id"
+        },
+        "snapshot_content_hash": {
+          "default": "",
+          "description": "被审核快照 items 的内容哈希（版本绑定，防过期复用）",
+          "maxLength": 128,
+          "title": "Snapshot Content Hash",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "description": "本次筛查运行时间",
+          "format": "date-time",
+          "title": "Reviewed At",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/HotReviewItem"
+          },
+          "maxItems": 200,
+          "title": "Items",
+          "type": "array"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "各审核状态计数",
+          "maxProperties": 20,
+          "title": "Counts",
+          "type": "object"
+        },
+        "semantic_review_executed": {
+          "default": false,
+          "description": "是否实际执行语义复核（LLM）",
+          "title": "Semantic Review Executed",
+          "type": "boolean"
+        },
+        "semantic_review_failed": {
+          "default": false,
+          "description": "语义复核是否执行失败/不可用（与「通过」区分）",
+          "title": "Semantic Review Failed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "review_id"
+      ],
+      "title": "HotReviewRecord",
+      "type": "object"
     }
   },
   "enums": {
@@ -1105,6 +1379,28 @@
       "effect",
       "draft",
       "evidence"
+    ],
+    "review_status": [
+      "approved",
+      "caution",
+      "needs_review",
+      "rejected"
+    ],
+    "review_method": [
+      "deterministic",
+      "llm",
+      "deterministic_llm",
+      "unreviewed"
+    ],
+    "risk_flag": [
+      "unverified_claim",
+      "sensitive_event",
+      "privacy_minor",
+      "politics_legal",
+      "misleading_conclusion",
+      "low_relevance",
+      "stale",
+      "insufficient_evidence"
     ]
   }
 }

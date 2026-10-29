@@ -9,6 +9,9 @@
 - M10.1 最终运行时加固已落地：`--result` 误回灌保护（绑定 wrapper）、SQLite 连接生命周期修复、Audit 全文规则澄清、Retro 增量触发。
 - M10.2 通用内容写作已落地：`write --topic`（无 mapping 的 Generic 路径）+ schema_summary 嵌套 $ref 展开 + audit mode 措辞。能力模型 = Case-based（Case→optional Analysis→Mapping→Writing）+ Generic（Topic→Sources→Writing），共同收口 Punctuation→Audit→Output。
 - M11 去 AI 味确定性门禁已落地：`kb.py deai`（零 LLM，Humanizer-zh 31 模式机械子集规则化）+ audit 注入 `deai` 检查项。
+- M12 Slash Command Layer 已落地：11 条 `/cw-*` 命令（`commands/cw-*.md` 命令文件 + `scripts/cw.py` 薄 CLI + `scripts/core/commands.py` 命令契约 + `scripts/core/hotspots.py` 多源热榜编排）。Claude Code 经 `~/.claude/commands/cw-*.md` 软链接线；Codex 走 skill 自然语言路由 + `cw.py`/`kb.py` CLI（无 slash commands）。
+- M13 `/cw-hot` 内容风险筛查关卡已落地：`scripts/core/hotreview.py`（确定性规则 + 可选批量语义复核，三模式 LLM）+ `schema.py` 新增 `HotReviewItem`/`HotReviewRecord`（`extra="forbid"`，不新增 schema ENTITY/DB migration）+ 审核结果落独立 `hotlist_review` artifact（review_id 由快照 content_hash 稳定派生，复用不覆盖旧审核）。`fetch_status` 与 `review_status` 强制分离；硬风险标签（sensitive_event/politics_legal/privacy_minor/misleading_conclusion）语义复核最多 `caution` 不得 `approved`；LLM 不可用/未执行如实标记 `review_method`，绝不伪装 `approved`。下游 8 命令（research/topic/write/audit/revise/library/export/status/continue）统一质量门禁，读持久化审核状态，未筛查数据不得混入选题/写作/终稿。
+- `/database-check` 可视化检查已落地：`commands/database-check.md` + `scripts/database_check.py`（导出 counselors-writing → RhineLabUI `archives.json` 并打开本地可视化档案阵列；内部调用 `scripts/export_rhinelab.py`）。可视化是只读导出，数据以 canonical JSON 为真相源，不修改知识库。
 - 版本：Skill `3.2.0` / KB `1.2.0` / Schema `1.2.0` / DB `3`。
 - **状态：3.2.0 Beta 版（成稿审核与事实校验加固）。**
 
@@ -17,6 +20,7 @@
 - **数据契约**：`scripts/core/schema.py`（Pydantic）是唯一真相源；`data/schemas/*.json` 是导出产物，禁止手改。
 - **CLI**：`scripts/kb.py` 是唯一统一入口；`scripts/core/*.py` 是确定性核心。
 - **方法规则**：`references/*.md` 是专项方法的唯一规则源。
+- **命令层**：`scripts/core/commands.py`（COMMAND_SPECS）是 `/cw-*` 命令契约单一真相源；`commands/cw-*.md` 是其宿主无关命令文件；`scripts/cw.py` 是薄 CLI。
 
 ## 3. 修改代码前的安全规则
 
