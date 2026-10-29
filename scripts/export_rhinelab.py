@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """把 counselors-writing 知识库导出为 RhineLabUI 的 archives.json（三维档案阵列数据）。
 
-只读 canonical JSON（真相源），生成符合 RhineLabUI 契约的 40 份档案（5 分类 × 8）。
+只读 canonical JSON（真相源），按 5 个分类全量生成档案（不设数量上限）。
 不改 RhineLabUI 代码，只替换其 content/archives.json；覆盖前自动备份为 archives.json.orig。
 
 用法：
     python scripts/export_rhinelab.py [--out <archives.json 路径>]
 
-契约（来自 RhineLabUI scripts/archive-content.mjs 的 validateContent）：
+契约（来自 RhineLabUI scripts/archive-content.mjs 的 validateContent，已放宽为全量）：
     - categories / columns 各 5 个非空分类名，集合相同
-    - records 恰好 40 份，每分类恰好 8 份
+    - records 数量 = 知识库实际实体数，无固定上限
     - 每条：id/title/en/department/category/date/lead/clearance/abstract/source 非空文本
-    - id 为 X-001..X-040 顺序；source 为 http/https URL；findings 至少一条
+    - id 为 X-001..X-NNN 顺序；source 为 http/https URL；findings 至少一条
 """
 from __future__ import annotations
 
@@ -32,7 +32,6 @@ DEFAULT_OUT = Path(
     "/Users/xinyuang/Desktop/莱茵生命-1/RhineLabUI-main/content/archives.json")
 
 CATEGORIES = ["案例档案", "选题档案", "来源档案", "审核档案", "风格档案"]
-PER_CATEGORY = 8
 
 
 def _load_dir(entity: str) -> list[dict]:
@@ -68,10 +67,6 @@ def _load_styles() -> list[dict]:
 def _updated_at(rec: dict) -> str:
     """排序键：updated_at（ISO 字符串字典序 = 时间序），缺失排最后。"""
     return str(rec.get("updated_at") or "")
-
-
-def _top(records: list[dict], n: int) -> list[dict]:
-    return sorted(records, key=_updated_at, reverse=True)[:n]
 
 
 def _date(rec: dict) -> str:

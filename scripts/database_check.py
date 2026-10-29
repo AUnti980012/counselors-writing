@@ -47,12 +47,12 @@ def _server_alive(url: str) -> bool:
         return False
 
 
-def _start_server(rhinelab_dir: Path) -> None:
+def _start_server(rhinelab_dir: Path, port: int) -> None:
     print("2/3 启动 RhineLabUI dev server（后台）...", flush=True)
     log = rhinelab_dir / ".database-check.dev.log"
     with open(log, "ab") as out:
         subprocess.Popen(
-            ["npm", "run", "dev"],
+            ["npm", "run", "dev", "--", "--port", str(port)],
             cwd=str(rhinelab_dir),
             stdout=out,
             stderr=subprocess.STDOUT,
@@ -91,7 +91,7 @@ def main(argv=None) -> int:
         return code
 
     if not _server_alive(url):
-        _start_server(rhinelab_dir)
+        _start_server(rhinelab_dir, args.port)
         if not _wait(url):
             print(
                 f"dev server 未在 {url} 就绪，请在该目录手动运行 `npm run dev`。",
