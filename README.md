@@ -67,6 +67,7 @@ python scripts/kb.py output render --draft <draft_id> --audit <audit_id>
 | 报媒文风仿写 | `references/style-library.md` |
 | 思政质检 | `references/ideological-review.md` + `kb.py audit` |
 | 传播复盘沉淀 | `references/dissemination-review.md` |
+| 查看知识库可视化 | `/database-check`（`python scripts/database_check.py`，打开 RhineLabUI 档案阵列） |
 
 ## 没有某个兄弟 skill 时怎么办
 
