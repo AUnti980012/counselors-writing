@@ -454,6 +454,26 @@ class ExtractTests(unittest.TestCase):
         self.assertNotIn("13812345678", stmt)
         self.assertIn("[学号]", stmt)
 
+    def test_pii_redact_class_and_dorm(self):
+        """P1-4：班级/宿舍确定性脱敏（保守，避免过度依赖 LLM）。"""
+        from core.extract import _redact_pii
+        self.assertEqual(_redact_pii("2023级新闻1班的同学住在3号楼501室"),
+                         "[班级]的同学住在[宿舍]")
+        # 保守性：普通年份/楼号不误伤
+        self.assertNotIn("[班级]", _redact_pii("2023年入学"))
+        self.assertNotIn("[宿舍]", _redact_pii("2023年入学"))
+
+    def test_inject_deterministic_stamps_extraction_truncated(self):
+        """P1-5：提取截断状态写入实体（下游审核据此视为完整性存疑）。"""
+        from core.extract import _inject_deterministic
+        data, _evd = _inject_deterministic(
+            "case", "case_facts",
+            {"title": "案例", "background": "背景", "documented_facts": [],
+             "source_claims": []},
+            digest="a" * 64, source_ids=[], document_id="doc-x", chunk_ids=["chk-1"],
+            truncated=True)
+        self.assertTrue(data["extraction_truncated"])
+
     def test_cache_hit_checks_entity_present(self):
         """审查锁：缓存命中但知识实体已删 → 视同 miss 重跑（不返回失效 success）。"""
         llm = self._llm([json.dumps(VALID_CASE, ensure_ascii=False)])

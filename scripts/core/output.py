@@ -14,6 +14,7 @@ import hashlib
 import re
 from typing import Any, Dict, Optional
 
+from core.audit import draft_content_hash
 from core.extract import ExtractionDeps, default_extraction_deps
 from core.preprocess import count_words
 from core.schema import SCHEMA_VERSION
@@ -24,6 +25,13 @@ _PLACEHOLDER_RE = re.compile(r"\{([a-z_]+)\}")
 
 class OutputInputError(ValueError):
     """输出输入缺失（draft 不存在）——运行时数据错误，非用法错误。"""
+
+
+class AuditGateError(ValueError):
+    """出稿审核门禁未通过（缺审核/审核不存在/属别的草稿/未通过/内容不一致）。
+
+    CLI 应映射 exit 2（校验未通过），与 audit 不通过的语义一致。
+    """
 
 
 def _render_sections(sections) -> str:
@@ -72,18 +80,38 @@ def render_draft(draft, template: str = None) -> str:
 
 
 def finalize(*, draft_id: str, deps: ExtractionDeps = None,
-             template: str = None, audit_id: str = None) -> Dict[str, Any]:
+             template: str = None, audit_id: str = None,
+             force: bool = False) -> Dict[str, Any]:
     """渲染 draft 为最终文档并落 FINAL artifact（permanent，零 LLM）。
 
+    出稿审核门禁（P0-1，唯一最终稿路径）：
+    - 非 force 路径要求提供有效审核（存在、属当前草稿、passed、内容摘要一致），
+      任一不满足抛 AuditGateError（CLI exit 2）；
+    - force 路径跳过校验，但 metadata 记录 forced=true 留痕，且不推进草稿状态。
     同 draft + 同模板 → 同渲染文本 → artifact 幂等复用（content_hash 幂等）。
-    交付统计（char_count/word_count/content_hash）一律基于**最终渲染文件**计算，
-    不得沿用 draft.word_count（初稿口径，不含标题/落款/markdown）。
-    返回小型指针（正文不进输出）。
+    交付统计（char_count/word_count/content_hash）一律基于**最终渲染文件**计算。
     """
     deps = deps or default_extraction_deps()
     draft = deps.repo.get_draft(draft_id)
     if draft is None:
         raise OutputInputError(f"draft 不存在：{draft_id}（先 kb.py write 产出草稿）")
+
+    if not force:
+        if not audit_id:
+            raise AuditGateError(
+                "缺少审核记录：output render 需要 --audit <audit_id>（确认无审核需求时用 --force 强制并留痕）")
+        audit = deps.repo.get_audit(audit_id)
+        if audit is None:
+            raise AuditGateError(f"审核不存在：{audit_id}")
+        if audit.draft_id != draft_id:
+            raise AuditGateError(
+                f"审核 {audit_id} 属于草稿 {audit.draft_id}，与当前草稿 {draft_id} 不匹配")
+        if not audit.passed:
+            raise AuditGateError(f"审核 {audit_id} 未通过（passed=false），不得渲染最终稿")
+        current_hash = draft_content_hash(draft)
+        if not audit.draft_content_hash or audit.draft_content_hash != current_hash:
+            raise AuditGateError(
+                "审核内容摘要与当前草稿不一致（草稿可能已修改），请重新审核后再渲染")
 
     rendered = render_draft(draft, template)
     rendered_bytes = rendered.encode("utf-8")
@@ -94,6 +122,8 @@ def finalize(*, draft_id: str, deps: ExtractionDeps = None,
     metadata = {"draft_id": draft_id, "schema_version": SCHEMA_VERSION}
     if audit_id:
         metadata["audit_id"] = audit_id
+    if force:
+        metadata["forced"] = "true"
 
     rec, reused = deps.store.create(
         "final_output", rendered_bytes,
@@ -107,17 +137,22 @@ def finalize(*, draft_id: str, deps: ExtractionDeps = None,
         return {
             "status": "failed", "entity": "final_output",
             "artifact_id": rec.artifact_id, "draft_id": draft_id,
-            "audit_id": audit_id, "reused": reused,
+            "audit_id": audit_id, "reused": reused, "forced": force,
             "schema_version": SCHEMA_VERSION,
             "reason": "最终文件内容哈希与本次渲染不一致（交付链路异常）",
             "content_hash": content_hash, "registered_content_hash": rec.content_hash,
             "char_count": char_count, "word_count": word_count,
         }
 
+    # P1-7：草稿状态机接通——有效审核通过的出稿把 draft 推进到 final。
+    # force 跳过时不推进状态（避免把未审内容标记为已终稿）。
+    if not force and draft.status != "final":
+        deps.repo.save_draft(draft.model_copy(update={"status": "final"}))
+
     return {
         "status": "success", "entity": "final_output",
         "artifact_id": rec.artifact_id, "draft_id": draft_id,
-        "audit_id": audit_id, "reused": reused,
+        "audit_id": audit_id, "reused": reused, "forced": force,
         "schema_version": SCHEMA_VERSION,
         "content_hash": content_hash, "char_count": char_count,
         "word_count": word_count, "path": rec.path,

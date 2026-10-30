@@ -1,7 +1,7 @@
 # Data Contract（数据契约）
 
 > pack M1 STEP 17 交付物。权威定义 = `scripts/core/schema.py`（Pydantic 单一真相源）；`data/schemas/*.json` 为导出的机器可读契约文档（禁止手改）。本文档说明实体关系、所有权、生命周期与迁移规则。
-> 契约版本：schema_version 1.0.0（2026-09-30 冻结）。变更流程见 `docs/architecture/schema-conventions.md`。
+> 契约版本：schema_version 1.2.0（当前；本次修复仅新增可选字段，向后兼容 additive 变更）。变更流程见 `docs/architecture/schema-conventions.md`。
 
 ## 1. 实体总表（16 + common）
 
@@ -23,7 +23,7 @@
 | Draft | draft.schema.json | 正文草稿（lineage + claims 逐条溯源） | LLM 写作 | draft→reviewed→final | data/knowledge/articles/（canonical-only，无索引表） |
 | Extraction | extraction.schema.json | 提取运行记录（失败不丢源；自纠正 ≤2） | Python 编排 + LLM 提取 | success/extraction_failed/validation_failed/cancelled | SQLite extraction_cache + registry（M4 落地） |
 | Evidence | evidence.schema.json | 证据记录（三级回指，摘录 ≤500 字符） | LLM 提取 → Python 持久化 | created→valid | data/knowledge/evidence/ + SQLite evidence 表 |
-| common | common.schema.json | 共享 $defs（22 个）+ 枚举表 | — | — | — |
+| common | common.schema.json | 共享 $defs（24 个）+ 枚举表 | — | — | — |
 | seed 信封 | seed.schema.json | seed.json 的文件信封（自含 StyleRecord $defs，独立于 common） | Python（M2 起读取/校验） | — | data/knowledge/styles/seed.json |
 
 ## 2. Ownership（所有权分工）
@@ -64,7 +64,7 @@ extraction ──input_refs/output_refs── 提取上下游
 
 ## 5. Versioning
 
-- 每实体必含 `schema_version`（默认 1.0.0，Python 写入侧托管补齐；LLM 输出可省略）。
+- 每实体必含 `schema_version`（默认 1.2.0，Python 写入侧托管补齐；LLM 输出可省略）。
 - 契约变更：改 `scripts/core/schema.py` → 全测试绿 → `kb.py schemas export` → diff 审查 → 递增版本号。导出的 JSON 永远不许手改（漂移检测：`kb.py schemas export --check`，exit 1）。
 
 ## 6. Fact / Inference 规则（硬约束，Pydantic model_validator 强制）

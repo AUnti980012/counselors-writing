@@ -141,6 +141,33 @@
         "mode": "economy",
         "temperature": null
       }
+    },
+    "truncated": {
+      "default": false,
+      "description": "素材（字符预算或块数）被截断",
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "input_chars": {
+      "default": 0,
+      "description": "实际注入 prompt 的素材字符数",
+      "minimum": 0,
+      "title": "Input Chars",
+      "type": "integer"
+    },
+    "included_chunks": {
+      "default": 0,
+      "description": "实际注入的 chunk 数",
+      "minimum": 0,
+      "title": "Included Chunks",
+      "type": "integer"
+    },
+    "total_chunks": {
+      "default": 0,
+      "description": "输入的 chunk 总数",
+      "minimum": 0,
+      "title": "Total Chunks",
+      "type": "integer"
     }
   },
   "required": [

@@ -14,7 +14,7 @@
 ## B. Partially completed（部分完成）
 
 - 端到端「真实数据」闭环：管道各阶段单测/回归锁全覆盖，但 V1 数据层为空壳、真实 add→search→write→audit→output 全链尚未用真实案例跑通（`data/knowledge` 现仅 seed.json）。
-- slash commands 9 条薄包装（可选项，未做，非核心）。
+- slash commands：终版时 9 条薄包装未做；**M12/M13（3.3.0）已实现 11 条 `/cw-*`**（`commands/` + `scripts/cw.py` + `commands.py`）。
 
 ## C. Known limitations（已知限制）
 
@@ -52,8 +52,8 @@
 | 抖音整页 innerText | 3k-20k | ≤限长截断 | C-02 结构化 [{title,topic,likes}] |
 | style_lib 整库 dump | 线性增长 | ≤10 | C-05 `--top` 硬上限 |
 | case 摘要含长文本 | 随库增长 | L1 五字段 | 紧凑投影 + `--top` 钳制（C-04） |
-| 边写边审 N+1 重读 | 多次重读 | 1 次 audit | 单通道七项 + 标点门禁零 LLM |
-| 七项清单双重书写 | 2 份 | 1 份 | schema_summary 单一源 |
+| 边写边审 N+1 重读 | 多次重读 | 1 次 audit | 单通道八项 + 标点/去AI 门禁零 LLM |
+| 八项清单双重书写 | 2 份 | 1 份 | schema_summary 单一源 |
 | 热榜 JSON 桥接 prompt | 0.5k-2k | ≤top 裁剪 | rank+title 摘要 |
 | 标点 findings 逐行 | 无上限 | ≤--max-findings | 汇总统计行 |
 
@@ -64,5 +64,5 @@
 1. 真实数据导入 + 端到端 smoke（用一份真实班会案例跑通 add→search→analysis→mapping→write→audit→output）。
 2. draft/audit/effect 检索索引（数据量增长后）。
 3. task 状态机接线各管道（`--task` 锚点贯穿）。
-4. slash commands 9 条薄包装（如团队用 slash 习惯）。
+4. slash commands（已实现 11 条，见 `scripts/core/commands.py`；无需再立项）。
 5. `docs/history/token-boundary-audit.md` 实测化（真实场景 token 计数替代估算）。

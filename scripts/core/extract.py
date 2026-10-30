@@ -75,10 +75,12 @@ _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
 _DETERMINISTIC_KEYS = {"case_id", "style_id", "topic_id", "schema_version",
                        "created_at", "updated_at", "source_ids", "origin",
                        "extraction_id", "attempts", "status", "content_hash",
-                       "usage_count", "generation_status", "evidence_basis"}
+                       "usage_count", "generation_status", "evidence_basis",
+                       "extraction_truncated", "hot_id", "hot_review_status",
+                       "hot_review_id"}
 
 # 确定性 PII 脱敏兜底（学生隐私硬门槛）。姓名无法确定性识别，依赖 LLM prompt
-# 指令脱敏；此处只兜底「确定性模式」（学号/身份证/手机号/邮箱）。
+# 指令脱敏；此处兜底「确定性模式」：学号/身份证/手机号/邮箱，以及保守的班级/宿舍。
 # 注意：用 (?<!\d)...(?!\d) 而非 \b——中文（\w）与数字之间无 \b 边界（审查发现）。
 # 顺序：身份证（18 位）→ 手机号（11 位）→ 学号（8-12 位），长的先匹配防误伤。
 _PII_PATTERNS = [
@@ -86,6 +88,10 @@ _PII_PATTERNS = [
     (re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)"), "[手机号]"),
     (re.compile(r"(?<!\d)\d{8,12}(?!\d)"), "[学号]"),
     (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "[邮箱]"),
+    # 班级（P1-4）：20XX级 + 短专业/序号 + 班，最特异、误报率低
+    (re.compile(r"20\d{2}级[^\s，。；：、]{0,8}班"), "[班级]"),
+    # 宿舍（P1-4）：楼栋号 + 房间号（如 3号楼501室 / 12栋302宿舍）
+    (re.compile(r"(?<!\d)\d{1,3}(?:号楼|栋|号)\d{1,4}(?:室|宿舍|寝室)"), "[宿舍]"),
 ]
 
 
@@ -157,11 +163,13 @@ def evidence_id_for(document_id: str, field: str, index: int, statement: str) ->
 # Python 托管字段：prompt 里不要求 LLM 填（注入时补齐/剥离）
 _MANAGED_FIELDS = {
     "case": {"case_id", "schema_version", "created_at", "updated_at", "source_ids",
-             "evidence"},
+             "evidence", "extraction_truncated"},
     "style": {"style_id", "schema_version", "created_at", "updated_at", "source_ids",
-              "origin", "exemplar_refs", "content_hash", "usage_count"},
+              "origin", "exemplar_refs", "content_hash", "usage_count",
+              "extraction_truncated"},
     "topic": {"topic_id", "schema_version", "created_at", "updated_at",
-              "source_basis", "evidence_basis", "generation_status"},
+              "source_basis", "evidence_basis", "generation_status",
+              "extraction_truncated", "hot_id", "hot_review_status", "hot_review_id"},
     # M5：analysis/mapping 的托管字段（否则 schema_summary 会把 analysis_id 等
     # 列进「必填」清单，与同 prompt 的「不要输出 id/时间戳」禁令矛盾——审查确认）
     "analysis": {"analysis_id", "input_case_ids", "schema_version", "created_at",
@@ -283,15 +291,15 @@ def _constraints(spec: Dict[str, Any]) -> str:
 
 # ---- prompt 构造 ----
 
-def build_extraction_prompt(extractor: str, chunks: List[Dict[str, str]],
-                            *, source_id: str = "", document_id: str = "",
-                            max_input_chars: int = MAX_INPUT_CHARS,
-                            model_mode: str = "economy") -> Tuple[str, bool]:
+def build_extraction_prompt_with_scope(extractor: str, chunks: List[Dict[str, str]],
+                                       *, source_id: str = "", document_id: str = "",
+                                       max_input_chars: int = MAX_INPUT_CHARS,
+                                       model_mode: str = "economy") -> Tuple[str, bool, int, int]:
     """最小 prompt：指令 + schema 摘要 + 有界 chunks + evidence refs。
 
-    返回 (prompt, truncated)。素材预算 = min(max_input_chars, 总预算 - 固定开销)，
-    确保 prompt 总长 ≤ MAX_PROMPT_CHARS（Token 检查点 B：estimate_tokens < 4000）。
-    chunks 按顺序累加，超预算截断并明确标注（绝不静默丢上下文）。
+    返回 (prompt, truncated, included_chunks, input_chars)：
+    - included_chunks / input_chars 记录实际注入的素材范围（P1-5 留痕）；
+    - chunks 按顺序累加，超预算截断并明确标注（绝不静默丢上下文）。
     """
     entity = EXTRACTOR_ENTITY[extractor]
     fixed_lines: List[str] = [_INSTRUCTION[extractor]]
@@ -334,6 +342,17 @@ def build_extraction_prompt(extractor: str, chunks: List[Dict[str, str]],
                               f"基于已注入内容提取，不要编造未注入部分。）")
 
     prompt = fixed + "\n".join(material_lines) + tail
+    return prompt, truncated, included, used
+
+
+def build_extraction_prompt(extractor: str, chunks: List[Dict[str, str]],
+                            *, source_id: str = "", document_id: str = "",
+                            max_input_chars: int = MAX_INPUT_CHARS,
+                            model_mode: str = "economy") -> Tuple[str, bool]:
+    """最小 prompt（兼容包装，只返回 (prompt, truncated)；内部走 with_scope 并丢弃范围）。"""
+    prompt, truncated, _included, _used = build_extraction_prompt_with_scope(
+        extractor, chunks, source_id=source_id, document_id=document_id,
+        max_input_chars=max_input_chars, model_mode=model_mode)
     return prompt, truncated
 
 
@@ -382,7 +401,7 @@ def parse_llm_json(text: str) -> Optional[Dict[str, Any]]:
 
 def _inject_deterministic(entity: str, extractor: str, data: Dict[str, Any],
                           digest: str, source_ids: List[str], document_id: str,
-                          chunk_ids: List[str]) -> Tuple[Dict[str, Any], List[EvidenceRecord]]:
+                          chunk_ids: List[str], truncated: bool = False) -> Tuple[Dict[str, Any], List[EvidenceRecord]]:
     """剥离 LLM 越权字段 + 注入确定性字段 + 生成证据记录 + PII 脱敏。
 
     返回 (可校验的实体 dict, 待保存的 EvidenceRecord 列表)。
@@ -402,6 +421,8 @@ def _inject_deterministic(entity: str, extractor: str, data: Dict[str, Any],
                                                chunk_ids)
     else:
         raise ValueError(f"未知提取实体：{entity!r}")
+    # P1-5：提取范围截断写入实体（下游审核据此视为完整性存疑，不得当完整素材核验）。
+    data["extraction_truncated"] = truncated
     return data, evidence_records
 
 
@@ -772,13 +793,14 @@ def extract(*, extractor: str, llm_fn: Callable[[str], str],
                 return ptr
             # 缓存损坏或知识实体已丢失 → 视同 miss 重跑（审查确认）
 
-    base_prompt, truncated = build_extraction_prompt(
+    base_prompt, truncated, included_chunks, input_chars = build_extraction_prompt_with_scope(
         extractor, chunks, source_id=(source_ids[0] if source_ids else ""),
         document_id=document_id,
         max_input_chars=max_input_chars, model_mode=model_mode)
+    total_chunks = len(chunk_ids)
     # 块数截断（MAX_CHUNKS_IN_PROMPT）也纳入 truncated（审查确认：前 20 块截断
     # 不得静默——即使字符预算未超）
-    truncated = truncated or len(chunk_ids) > MAX_CHUNKS_IN_PROMPT
+    truncated = truncated or total_chunks > MAX_CHUNKS_IN_PROMPT
 
     # 自纠正循环：初次 + ≤MAX_SELF_CORRECT 次修正（有限重试，RETRY RULE）。
     # prompt 每次自纠正都基于「原始 base_prompt + 最新反馈」，不累计历史反馈。
@@ -799,7 +821,8 @@ def extract(*, extractor: str, llm_fn: Callable[[str], str],
                 prompt = _self_correct_prompt(base_prompt, errors, last_output)
             continue
         injected, evidence_records = _inject_deterministic(
-            entity, extractor, parsed, digest, source_ids, document_id, chunk_ids)
+            entity, extractor, parsed, digest, source_ids, document_id, chunk_ids,
+            truncated=truncated)
         errors = _to_errors(entity, injected)
         if not errors:
             success_data = injected
@@ -817,7 +840,9 @@ def extract(*, extractor: str, llm_fn: Callable[[str], str],
 
     return _succeed(deps, extractor, entity, input_refs, digest, source_ids,
                     document_id, success_data, success_evidence, attempts,
-                    truncated, model_mode, cache_key if use_cache else None)
+                    truncated, model_mode, cache_key if use_cache else None,
+                    input_chars=input_chars, included_chunks=included_chunks,
+                    total_chunks=total_chunks)
 
 
 def _chunks_digest(chunks: List[Dict[str, str]]) -> str:
@@ -848,7 +873,9 @@ def _succeed(deps: ExtractionDeps, extractor: str, entity: str,
              source_ids: List[str], document_id: str, data: Dict[str, Any],
              evidence_records: List[EvidenceRecord], attempts: int,
              truncated: bool, model_mode: str,
-             cache_key: Optional[str]) -> Dict[str, Any]:
+             cache_key: Optional[str],
+             input_chars: int = 0, included_chunks: int = 0,
+             total_chunks: int = 0) -> Dict[str, Any]:
     model = ENTITIES[entity]
     record = model.model_validate(data)
     # 先落证据（保证 fact.evidence_ids 有真实记录），再落知识实体
@@ -863,7 +890,9 @@ def _succeed(deps: ExtractionDeps, extractor: str, entity: str,
         input_refs=input_refs,
         output_refs={_OUTPUT_REF_KEY[entity]: [entity_id]},
         status="success", attempts=attempts,
-        model_metadata=ModelMetadata(mode=model_mode))
+        model_metadata=ModelMetadata(mode=model_mode),
+        truncated=truncated, input_chars=input_chars,
+        included_chunks=included_chunks, total_chunks=total_chunks)
 
     # extraction artifact（内容 = 提取运行记录；registry 记账，见 data-contract §1）。
     # 排除时间戳：created_at/updated_at 每次运行不同，作为内容会破坏 artifact

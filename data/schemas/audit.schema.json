@@ -157,6 +157,26 @@
       "maxLength": 1000,
       "title": "Summary",
       "type": "string"
+    },
+    "draft_content_hash": {
+      "default": "",
+      "description": "被审核草稿的 canonical 正文 sha256（绑定审核对象）",
+      "maxLength": 64,
+      "title": "Draft Content Hash",
+      "type": "string"
+    },
+    "audited_chars": {
+      "default": 0,
+      "description": "实际进入审核 prompt 的正文字符数",
+      "minimum": 0,
+      "title": "Audited Chars",
+      "type": "integer"
+    },
+    "truncated": {
+      "default": false,
+      "description": "正文超单次上下文容量被截断（截断即不得通过）",
+      "title": "Truncated",
+      "type": "boolean"
     }
   },
   "required": [

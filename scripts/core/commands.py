@@ -42,7 +42,7 @@ _COMMON = {
             "热点引用解析：python scripts/cw.py hot resolve <序号|hot-id>（过期/歧义/不存在明确报错；返回含审核状态）",
             "URL → python scripts/kb.py fetch <url>；文本/文件 → kb.py ingest --file/-；已有 → kb.py artifact get",
             "结构化提取：kb.py extract <doc> --extractor topic_signal|case_facts（三模式 LLM）",
-            "继承上游热点审核：读取 review_status/risk_flags 并写入下游选题风险，不把标题/热度/二手转述当已核实事实",
+            "热点审核绑定：python scripts/kb.py hot link --topic <topic_id> --hot <序号|hot-id>（把 review_status 写入 TopicRecord；写作门禁据此放行/拒绝，不把标题/热度/二手转述当已核实事实）",
             "证据整理：区分 来源存在 / 可访问 / 摘录可定位 / 证据支持断言；标记二手/冲突/不足/无法访问",
         ],
         "outputs": ["SourceRecord + Document + TopicRecord/CaseRecord + EvidenceRecord（Python 校验落盘）",
@@ -57,12 +57,12 @@ _COMMON = {
         "routing": [
             "路由判断（Case-based vs Generic）：docs/integration/agent-integration.md",
             "案例：kb.py extract case_facts → kb.py mapping --case → kb.py write --mapping",
-            "通用：kb.py extract topic_signal → kb.py write --topic [--mode …]",
+            "通用：kb.py extract topic_signal → （热点来源须 kb.py hot link 绑定）→ kb.py write --topic [--mode …]",
             "收口：kb.py punctuation + kb.py deai + kb.py audit --draft + kb.py output render --draft --audit",
         ],
         "outputs": ["DraftRecord → AuditRecord → FINAL artifact（真实文件路径 + 统计 + 血缘）"],
         "status": "implemented",
-        "notes": "未明确要求时不做全流水线；未核实事实不得升级为确定陈述；可修复质量问题有限次修正，不无限循环；继承 TopicRecord.risks 与研究风险，高风险且无证据的断言须受限，不得把未筛查热点扩写成确定新闻",
+        "notes": "写作是一次 LLM 调用产出整稿，非「边写边审」；未明确要求时不做全流水线；未核实事实不得升级为确定陈述；可修复质量问题有限次修正，不无限循环；热点来源选题未通过审核（needs_review/rejected/缺失）会被 kb.py write 拒绝，不得把未筛查热点扩写成确定新闻",
     },
     "cw-audit": {
         "name": "/cw-audit",
@@ -86,12 +86,12 @@ _COMMON = {
         "routing": [
             "kb.py extract <doc> --extractor topic_signal（五角度 + 标题三式 + 风险）",
             "kb.py search topic <kw>（检索已有选题，避免重复）",
-            "优先 approved 候选；caution 候选须把限制写入 TopicRecord.risks；needs_review/rejected 不得无条件提升",
+            "热点来源选题须 kb.py hot link 绑定审核状态；优先 approved 候选；caution 候选须把限制写入 TopicRecord.risks；needs_review/rejected 不得无条件提升",
             "选题规则源：references/topic-selection.md",
         ],
         "outputs": ["TopicRecord（推荐理由/读者痛点/备选角度/标题方向/证据缺口/风险约束）"],
         "status": "implemented",
-        "notes": "选题评分依据必须来自真实素材/风险规则，不得伪造评分依据；上游审核状态经 risks 字段持久化传播，不得依赖聊天上下文",
+        "notes": "选题评分依据必须来自真实素材/风险规则，不得伪造评分依据；上游审核状态经 hot_id/hot_review_status/hot_review_id 持久化传播，不得依赖聊天上下文",
     },
     "cw-revise": {
         "name": "/cw-revise",
@@ -139,7 +139,7 @@ _COMMON = {
         ],
         "outputs": ["状态 + context_refs + 输出引用 + 事件日志 + 缓存统计"],
         "status": "implemented",
-        "notes": "只报真实状态；缓存命中须重新确认审核状态/版本/依赖仍有效，仅显示 HIT 不算验证",
+        "notes": "只报真实状态；缓存命中须重新确认审核状态/版本/依赖仍有效，仅显示 HIT 不算验证；TaskManager 是独立手动状态机（kb.py task），ingest/extract/write/audit 不自动创建/推进任务",
     },
     "cw-continue": {
         "name": "/cw-continue",
@@ -151,7 +151,7 @@ _COMMON = {
         ],
         "outputs": ["恢复锚点 + 下一步建议"],
         "status": "implemented",
-        "notes": "不得重复执行全部工作流，不得使用已失效中间产物（各模块缓存幂等 + TTL 保证）；恢复时须重新确认审核状态/版本/依赖，不得在缓存命中时跳过必要审核",
+        "notes": "不得重复执行全部工作流，不得使用已失效中间产物（各模块缓存幂等 + TTL 保证）；恢复时须重新确认审核状态/版本/依赖，不得在缓存命中时跳过必要审核；TaskManager 是独立手动状态机（kb.py task resume 读锚点），主流程不自动推进",
     },
     "cw-help": {
         "name": "/cw-help",

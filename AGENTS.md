@@ -12,8 +12,9 @@
 - M12 Slash Command Layer 已落地：11 条 `/cw-*` 命令（`commands/cw-*.md` 命令文件 + `scripts/cw.py` 薄 CLI + `scripts/core/commands.py` 命令契约 + `scripts/core/hotspots.py` 多源热榜编排）。Claude Code 经 `~/.claude/commands/cw-*.md` 软链接线；Codex 走 skill 自然语言路由 + `cw.py`/`kb.py` CLI（无 slash commands）。
 - M13 `/cw-hot` 内容风险筛查关卡已落地：`scripts/core/hotreview.py`（确定性规则 + 可选批量语义复核，三模式 LLM）+ `schema.py` 新增 `HotReviewItem`/`HotReviewRecord`（`extra="forbid"`，不新增 schema ENTITY/DB migration）+ 审核结果落独立 `hotlist_review` artifact（review_id 由快照 content_hash 稳定派生，复用不覆盖旧审核）。`fetch_status` 与 `review_status` 强制分离；硬风险标签（sensitive_event/politics_legal/privacy_minor/misleading_conclusion）语义复核最多 `caution` 不得 `approved`；LLM 不可用/未执行如实标记 `review_method`，绝不伪装 `approved`。下游 8 命令（research/topic/write/audit/revise/library/export/status/continue）统一质量门禁，读持久化审核状态，未筛查数据不得混入选题/写作/终稿。
 - `/database-check` 可视化检查已落地：`commands/database-check.md` + `scripts/database_check.py`（导出 counselors-writing → RhineLabUI `archives.json` 并打开本地可视化档案阵列；内部调用 `scripts/export_rhinelab.py`）。可视化是只读导出，数据以 canonical JSON 为真相源，不修改知识库。
-- 版本：Skill `3.2.0` / KB `1.2.0` / Schema `1.2.0` / DB `3`。
-- **状态：3.2.0 Beta 版（成稿审核与事实校验加固）。**
+- M14 出稿/审核/热点门禁收口已落地（本次修复）：`output render` 强制 `--audit`（存在/属当前草稿/passed/内容摘要一致，否则 exit 2），`--force` 跳过但血缘留痕 `forced=true`；`kb.py hotlist` 与 `cw.py hot` 统一输出带审核状态的榜单，`kb.py hot link --topic --hot` 把热点审核状态绑定到 TopicRecord，`kb.py write --topic` 对未筛查/未通过热点 fail-closed；审核正文优先、来源先缩，截断即 `passed=false`；提取截断与热点溯源写入实体/ExtractionRecord；草稿状态机接通（audit 通过→reviewed，出稿→final）。
+- 版本：Skill `3.3.0` / KB `1.2.0` / Schema `1.2.0` / DB `3`。
+- **状态：3.3.0 正式版（出稿审核硬门禁 + 热点关卡统一 + 截断 fail-closed）。**
 
 ## 2. 单一真相源
 

@@ -20,10 +20,12 @@ from unittest import mock
 from core.artifact import ArtifactStore, Registry
 from core.hotreview import (
     REVIEW_ARTIFACT_TYPE,
+    HotReviewGateError,
     attach_review,
     build_semantic_prompt,
     deterministic_review,
     load_latest_review_for,
+    require_reviewed_hot_topic,
     review_content_hash,
     review_for_item,
     review_hotspots,
@@ -314,6 +316,38 @@ class CwHotCliTests(unittest.TestCase):
         self.assertEqual(data["item"]["review_status"], "approved")
         self.assertEqual(data["item"]["review_method"], "deterministic")
         self.assertEqual(data["review_artifact_id"], "rid")
+
+
+class HotReviewGateTests(unittest.TestCase):
+    """P0-3 写作门禁：热点来源选题必须携带已持久化的审核状态。"""
+
+    def _topic(self, hot_id, status, risks=""):
+        from core.schema import TopicRecord
+        return TopicRecord(topic_id="top-000000000001", title="选题",
+                           hot_id=hot_id, hot_review_status=status, risks=risks)
+
+    def test_non_hot_topic_passes(self):
+        require_reviewed_hot_topic(self._topic(None, None))
+
+    def test_approved_passes(self):
+        require_reviewed_hot_topic(self._topic("hot-000000000001", "approved"))
+
+    def test_caution_requires_risks(self):
+        with self.assertRaises(HotReviewGateError):
+            require_reviewed_hot_topic(self._topic("hot-000000000001", "caution", ""))
+        require_reviewed_hot_topic(self._topic("hot-000000000001", "caution", "须脱敏"))
+
+    def test_needs_review_rejected(self):
+        with self.assertRaises(HotReviewGateError):
+            require_reviewed_hot_topic(self._topic("hot-000000000001", "needs_review"))
+
+    def test_rejected_rejected(self):
+        with self.assertRaises(HotReviewGateError):
+            require_reviewed_hot_topic(self._topic("hot-000000000001", "rejected"))
+
+    def test_missing_status_rejected(self):
+        with self.assertRaises(HotReviewGateError):
+            require_reviewed_hot_topic(self._topic("hot-000000000001", None))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Schema Conventions（契约约定）
 
-> 单一真相源：`scripts/core/schema.py`（Pydantic ≥2）。`data/schemas/*.json` 由 `kb.py schemas export` 生成（17 份：16 实体 + common），**禁止手改**；`kb.py schemas export --check` 检测漂移（exit 1）。
+> 单一真相源：`scripts/core/schema.py`（Pydantic ≥2）。`data/schemas/*.json` 由 `kb.py schemas export` 生成（18 份：16 实体 + common + seed 信封），**禁止手改**；`kb.py schemas export --check` 检测漂移（exit 1）。
 
 ## 1. 命名与 id 前缀
 
@@ -48,7 +48,7 @@
 
 ## 6. $ref 解析规则
 
-实体 schema 文件内的 `"$ref": "#/$defs/Xxx"` 统一解析到 `common.json` 的 `$defs`（共享模型：FactClaim/EvidenceRef/RefPair/TopicAngle 等 22 个）。例外：`seed.schema.json` 是种子文件信封，自含 `StyleRecord` $defs（实体模型不进 common 共享区，避免悬空引用）。运行时校验以 Pydantic 模型为准，JSON 文件是跨工具可读的契约文档。
+实体 schema 文件内的 `"$ref": "#/$defs/Xxx"` 统一解析到 `common.json` 的 `$defs`（共享模型：FactClaim/EvidenceRef/RefPair/TopicAngle/HotReviewItem/HotReviewRecord 等 24 个）。例外：`seed.schema.json` 是种子文件信封，自含 `StyleRecord` $defs（实体模型不进 common 共享区，避免悬空引用）。运行时校验以 Pydantic 模型为准，JSON 文件是跨工具可读的契约文档。
 
 ## 7. 责任边界（RESPONSIBILITY BOUNDARY）
 

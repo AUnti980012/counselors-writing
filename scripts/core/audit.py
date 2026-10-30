@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any, Callable, Dict, List, Optional
 
 from core.analysis import _decode_cached
@@ -36,7 +37,12 @@ from core.schema import SCHEMA_VERSION, audit_completeness_violations
 from core.validate import MAX_SELF_CORRECT
 
 # Token 检查点 F：审核 prompt 预算（draft 全文 + 七项清单 + schema 摘要）
-MAX_PROMPT_CHARS = 8000  # 5000 token
+MAX_PROMPT_CHARS = 16000  # 总上限（正文 + grounding + 固定开销），量级约 10000 token
+
+# P0-2 修复：正文与来源内容分预算，正文优先、来源先缩。
+# 正文预算单独设大，保证常见推文全文进入审核；grounding（来源/证据）有界先缩。
+AUDIT_BODY_CHARS = 10000          # 正文（title+sections+closing）单次上下文预算
+AUDIT_GROUNDING_CHARS = 1200      # 事实核验上下文（来源片段 + 证据摘录）预算
 
 # 七项自查 + format（LLM 填）；punctuation 由 Python 确定性填
 _LLM_AUDIT_CHECKS = ["political", "factual", "value", "labeling", "ai_trace",
@@ -45,7 +51,8 @@ _LLM_AUDIT_CHECKS = ["political", "factual", "value", "labeling", "ai_trace",
 # audit 托管字段：LLM 不填，Python 注入/聚合
 _AUDIT_MANAGED_KEYS = {"audit_id", "draft_id", "schema_version", "created_at",
                        "updated_at", "passed", "fact_check", "style_check",
-                       "format_check", "risk_check"}
+                       "format_check", "risk_check", "draft_content_hash",
+                       "audited_chars", "truncated"}
 
 _GROUP_CHECKS = {
     "fact_check": {"political", "factual"},
@@ -58,6 +65,14 @@ _FATAL_CHECKS = {"political", "factual", "privacy"}
 # 事实核验上下文：选题风险标记（确定性信号——选题自身声明事实需核验/不得杜撰）
 _FACTUAL_RISK_MARKERS = ("不得杜撰", "不要编造", "尚未核实", "未经核实", "需核实",
                          "待核实", "无法核实", "未经证实", "尚未证实", "存疑")
+# P1-9：正文事实性断言检测（确定性、保守）——百分比/金额/具体年份/权威机构名。
+# 这些是强事实信号，即使 draft.claims 为空也必须触发事实核验（不得逃过检查）。
+_FACTUAL_ASSERTION_PAT = re.compile(
+    r"\d+(?:\.\d+)?\s*%|百分之[零一二三四五六七八九十百]+|"
+    r"\d+(?:\.\d+)?\s*(?:万|亿)?\s*元|"
+    r"\d{4}\s*年|"
+    r"教育部|卫健委|国务院|统计局|人社部|发改委|共青团中央|"
+    r"最高人民法院|最高人民检察院")
 # 热榜域：仅热榜转述，不构成权威核验
 _HOTLIST_DOMAINS = {"weibo.com", "s.weibo.com", "tophub.today"}
 # grounding 来源正文片段：有界（每来源前 N 个 chunk 的截断文本，防整文回流）
@@ -102,7 +117,7 @@ def audit_cache_key(draft_id: str, model_mode: str, content_digest: str) -> str:
     return f"analysis:audit:{digest}:{model_mode}:{SCHEMA_VERSION}"
 
 
-def _draft_fulltext(draft) -> str:
+def draft_fulltext(draft) -> str:
     """draft → 审核全文（title + sections + closing；正文有界）。"""
     parts = [draft.title]
     if draft.subtitle:
@@ -114,6 +129,15 @@ def _draft_fulltext(draft) -> str:
     if draft.closing:
         parts.append(draft.closing)
     return "\n\n".join(p for p in parts if p)
+
+
+# 兼容旧调用方（kb.py 等）的私有别名
+_draft_fulltext = draft_fulltext
+
+
+def draft_content_hash(draft) -> str:
+    """被审核草稿的 canonical 正文 sha256（审核 → 出稿门禁的内容一致性绑定）。"""
+    return hashlib.sha256(draft_fulltext(draft).encode("utf-8")).hexdigest()
 
 
 def _punctuation_issues(fulltext: str) -> List[Dict[str, Any]]:
@@ -195,6 +219,9 @@ def build_audit_grounding(repo, draft) -> Dict[str, Any]:
             evidence.append({"evidence_id": eid, "excerpt": excerpt[:200]})
 
     factual_risk = any(m in topic_risks for m in _FACTUAL_RISK_MARKERS)
+    # P1-5：选题提取阶段素材被截断 → 完整性存疑，视同事实风险（不得当完整素材核验）。
+    extraction_truncated = bool(getattr(topic, "extraction_truncated", False))
+    factual_risk = factual_risk or extraction_truncated
     verified_evidence = verified_sources > 0 or bool(evidence)
     return {
         "topic_id": topic_id,
@@ -204,28 +231,37 @@ def build_audit_grounding(repo, draft) -> Dict[str, Any]:
         "verified_sources": verified_sources,
         "verified_evidence": verified_evidence,
         "factual_risk": factual_risk,
+        "extraction_truncated": extraction_truncated,
     }
 
 
-def _apply_factual_gate(issues: List[Dict[str, Any]],
-                        grounding: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """确定性事实 floor：选题已标事实风险且无权威核验证据时，factual 不得 pass。
+def _body_has_factual_assertion(fulltext: str) -> bool:
+    """正文是否含确定性可识别的事实性断言（百分比/金额/年份/权威机构名）。"""
+    return bool(_FACTUAL_ASSERTION_PAT.search(fulltext or ""))
 
-    仅覆盖「可判定的约束」（选题自身声明 + 零权威证据）；标题暗示/风险兑现等
-    语义判断由 LLM 依据 grounding 完成。无 grounding 时原样返回（向后兼容）。
+
+def _apply_factual_gate(issues: List[Dict[str, Any]],
+                        grounding: Optional[Dict[str, Any]],
+                        body_has_factual_assertion: bool = False) -> List[Dict[str, Any]]:
+    """确定性事实 floor：无权威核验证据时，事实性内容不得以确定性事实放行。
+
+    - 选题标风险 / 提取截断 → factual=pass 降 fail（原有）；
+    - 正文含事实性断言（P1-9，即使 draft.claims 为空）→ factual=pass 降 fail。
+    仅覆盖「可判定的约束」；标题暗示/风险兑现等语义判断由 LLM 依据 grounding 完成。
     """
-    if not grounding or not grounding.get("factual_risk"):
+    if not grounding or grounding.get("verified_evidence"):
         return issues
-    if grounding.get("verified_evidence"):
+    factual_risk = grounding.get("factual_risk", False)
+    if not factual_risk and not body_has_factual_assertion:
         return issues
     out: List[Dict[str, Any]] = []
     for i in issues:
         if (isinstance(i, dict) and i.get("check") == "factual"
                 and i.get("verdict") == "pass"):
+            note_suffix = (" 事实依据：正文含事实性断言且无权威核验证据；"
+                           "不得以确定性事实放行。建议降级为审慎表述或补充可核实出处。")
             i = {**i, "verdict": "fail",
-                 "note": ((i.get("note") or "") +
-                          " 事实依据：选题已标注事实需核验，且无权威核验证据；"
-                          "不得以确定性事实放行。建议降级为一般性科普或改为审慎表述。").strip()}
+                 "note": ((i.get("note") or "") + note_suffix).strip()}
         out.append(i)
     return out
 
@@ -282,10 +318,15 @@ def _aggregate_groups(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"groups": groups, "passed": passed}
 
 
-def build_audit_prompt(fulltext: str, draft_title: str,
-                       model_mode: str = "economy", mode: str = "article",
-                       grounding: Optional[Dict[str, Any]] = None) -> str:
-    """审核 prompt：七项清单指令（按 mode 措辞）+ schema 摘要 + 事实核验上下文 + draft 全文。"""
+def build_audit_prompt_with_budget(fulltext: str, draft_title: str,
+                                   model_mode: str = "economy", mode: str = "article",
+                                   grounding: Optional[Dict[str, Any]] = None):
+    """审核 prompt（P0-2 修复版）：正文与来源内容分预算，正文优先、来源先缩。
+
+    返回 (prompt, truncated, audited_chars)：
+    - grounding（来源/证据）先按 AUDIT_GROUNDING_CHARS 截断，绝不挤占正文预算；
+    - 正文按 AUDIT_BODY_CHARS 截断；超限时 truncated=True（调用方据此 fail-closed）。
+    """
     fixed_lines = [_audit_instruction(mode)]
     if model_mode == "economy":
         fixed_lines.append("（economy 模式：直接、简洁地审核，逐项给结论。）")
@@ -309,25 +350,51 @@ def build_audit_prompt(fulltext: str, draft_title: str,
     fixed_lines.append("\n## 输出要求")
     fixed_lines.append("- issues 逐项给：check（上面 8 项之一）+ verdict（pass/warn/fail）+ note（具体到句子）+ location。")
     fixed_lines.append("- 只输出这些 issues + summary；分组/结论（passed 等）由系统按 verdict 硬规则计算。")
-    if grounding:
-        fixed_lines.append(_grounding_block(grounding))
-    tail = "\n\n只输出一个合法 JSON 对象（不要输出 markdown 代码块以外的解释文字）。"
 
+    tail = "\n\n只输出一个合法 JSON 对象（不要输出 markdown 代码块以外的解释文字）。"
     fixed = "\n".join(fixed_lines)
-    # draft 全文有界；超预算截断（保留头部，审核对象优先标题+开头）
+
+    # 来源/证据上下文：独立有界预算，先缩（正文优先——P0-2）。
+    grounding_block = ""
+    if grounding:
+        gblock = _grounding_block(grounding)
+        if len(gblock) > AUDIT_GROUNDING_CHARS:
+            gblock = gblock[:AUDIT_GROUNDING_CHARS] + "\n（事实核验上下文已截断，来源片段仅示部分）"
+        grounding_block = gblock
+
+    # 正文块：按正文预算截断（截断即 fail-closed，由 audit() 强制不通过）。
     draft_block = f"\n## 待审核内容（标题：{draft_title}）\n{fulltext}"
-    budget = max(1, MAX_PROMPT_CHARS - len(fixed) - len(tail))
-    if len(draft_block) > budget:
-        draft_block = draft_block[:budget] + "\n（推文已截断，基于可见部分审核）"
-    return fixed + draft_block + tail
+    truncated = False
+    audited_chars = len(fulltext)
+    if len(draft_block) > AUDIT_BODY_CHARS:
+        truncated = True
+        audited_chars = max(0, AUDIT_BODY_CHARS - len(f"\n## 待审核内容（标题：{draft_title}）\n"))
+        draft_block = draft_block[:AUDIT_BODY_CHARS] + "\n（推文已截断，基于可见部分审核）"
+
+    prompt = fixed + grounding_block + draft_block + tail
+    return prompt, truncated, audited_chars
+
+
+def build_audit_prompt(fulltext: str, draft_title: str,
+                       model_mode: str = "economy", mode: str = "article",
+                       grounding: Optional[Dict[str, Any]] = None) -> str:
+    """审核 prompt（兼容包装，只返回字符串；内部走 budget 版并丢弃截断元数据）。"""
+    prompt, _truncated, _audited = build_audit_prompt_with_budget(
+        fulltext, draft_title, model_mode, mode, grounding)
+    return prompt
 
 
 def _inject_audit(data: Dict[str, Any], audit_id: str, draft_id: str,
                   punctuation_issues: List[Dict[str, Any]],
                   deai_issues: List[Dict[str, Any]],
-                  grounding: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                  grounding: Optional[Dict[str, Any]] = None,
+                  draft_content_hash: str = "",
+                  audited_chars: int = 0,
+                  truncated: bool = False,
+                  body_has_factual_assertion: bool = False) -> Dict[str, Any]:
     """剥离 LLM 越权字段 + PII 脱敏 + 注入确定性字段（id + 标点/去AI + 分组 + verdict）
-    + 确定性事实 gate（选题标风险且无权威证据时 factual 不得 pass）。"""
+    + 确定性事实 gate（选题标风险且无权威证据时 factual 不得 pass）
+    + 审核覆盖门禁（正文截断 → passed 强制 false）。"""
     for key in _AUDIT_MANAGED_KEYS:
         data.pop(key, None)
     data = _redact_pii_recursive(data)
@@ -341,10 +408,12 @@ def _inject_audit(data: Dict[str, Any], audit_id: str, draft_id: str,
                   if not (isinstance(i, dict) and i.get("check") in ("punctuation", "deai"))]
         issues.extend(punctuation_issues)
         issues.extend(deai_issues)
-        data["issues"] = _apply_factual_gate(issues, grounding)
+        data["issues"] = _apply_factual_gate(issues, grounding,
+                                             body_has_factual_assertion)
     elif issues is None:
         data["issues"] = _apply_factual_gate(
-            list(punctuation_issues) + list(deai_issues), grounding)  # 无 LLM issue，仅确定性
+            list(punctuation_issues) + list(deai_issues), grounding,
+            body_has_factual_assertion)  # 无 LLM issue，仅确定性
     else:
         # 非 list（dict/str）：原样保留让 model_validate 报类型错误进自纠正，
         # 不聚合分组（畸形 issues 无聚合意义，校验会失败）
@@ -352,12 +421,23 @@ def _inject_audit(data: Dict[str, Any], audit_id: str, draft_id: str,
     data["audit_id"] = audit_id
     data["draft_id"] = draft_id
     data["schema_version"] = SCHEMA_VERSION
+    # 审核覆盖字段（Python 托管，绑定审核对象 + 记录实际范围）
+    data["draft_content_hash"] = draft_content_hash
+    data["audited_chars"] = audited_chars
+    data["truncated"] = truncated
     # 仅当 issues 是合法 list 时才聚合分组 + verdict（畸形 issues 交由校验报错）
     if isinstance(data["issues"], list):
         agg = _aggregate_groups(data["issues"])
         for name, g in agg["groups"].items():
             data[name] = g
         data["passed"] = agg["passed"]
+    # P0-2：正文截断 = 审核覆盖不完整，绝不静默放行（fail-closed）。
+    if truncated and isinstance(data["issues"], list):
+        data["passed"] = False
+        fmt = data.get("format_check") or {"passed": False, "notes": ""}
+        fmt["notes"] = (fmt.get("notes", "") +
+                        " 审核覆盖不完整（正文超单次上下文容量被截断），不得通过。").strip()
+        data["format_check"] = fmt
     return data
 
 
@@ -373,8 +453,9 @@ def audit(*, draft_id: str, llm_fn: Callable[[str], str],
     draft = deps.repo.get_draft(draft_id)
     if draft is None:
         raise AuditInputError(f"draft 不存在：{draft_id}（先 kb.py write 产出草稿）")
-    fulltext = _draft_fulltext(draft)
-    content_digest = hashlib.sha256(fulltext.encode("utf-8")).hexdigest()
+    fulltext = draft_fulltext(draft)
+    content_digest = draft_content_hash(draft)
+    body_has_factual_assertion = _body_has_factual_assertion(fulltext)
     cache_key = audit_cache_key(draft_id, model_mode, content_digest)
     audit_id = audit_id_for(draft_id, model_mode)
 
@@ -392,9 +473,10 @@ def audit(*, draft_id: str, llm_fn: Callable[[str], str],
     punctuation_issues = _punctuation_issues(fulltext)
     deai_issues = _deai_issues(fulltext)
     grounding = build_audit_grounding(deps.repo, draft)
-    base_prompt = build_audit_prompt(fulltext, draft.title, model_mode,
-                                     mode=getattr(draft, "mode", "article") or "article",
-                                     grounding=grounding)
+    base_prompt, truncated, audited_chars = build_audit_prompt_with_budget(
+        fulltext, draft.title, model_mode,
+        mode=getattr(draft, "mode", "article") or "article",
+        grounding=grounding)
 
     success_data: Optional[Dict[str, Any]] = None
     errors: List[ErrorDetail] = []
@@ -413,7 +495,10 @@ def audit(*, draft_id: str, llm_fn: Callable[[str], str],
                 prompt = _self_correct_prompt(base_prompt, errors, last_output)
             continue
         injected = _inject_audit(parsed, audit_id, draft_id, punctuation_issues,
-                                 deai_issues, grounding)
+                                 deai_issues, grounding,
+                                 draft_content_hash=content_digest,
+                                 audited_chars=audited_chars, truncated=truncated,
+                                 body_has_factual_assertion=body_has_factual_assertion)
         errors = _to_errors("audit", injected)
         if not errors:
             success_data = injected
@@ -434,6 +519,12 @@ def _succeed(deps: ExtractionDeps, audit_id: str, draft_id: str,
 
     record = AuditRecord.model_validate(data)
     deps.repo.save_audit(record)
+
+    # P1-7：草稿状态机接通——审核通过即把 draft 推进到 reviewed（写回 canonical）。
+    if record.passed:
+        draft = deps.repo.get_draft(draft_id)
+        if draft is not None and draft.status != "reviewed":
+            deps.repo.save_draft(draft.model_copy(update={"status": "reviewed"}))
 
     rec, _ = deps.store.create(
         "audit",

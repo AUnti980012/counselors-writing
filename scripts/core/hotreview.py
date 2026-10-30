@@ -421,3 +421,31 @@ def _assemble(snapshot: Dict[str, Any], record: Dict[str, Any],
         "items": items,
         "schema_version": SCHEMA_VERSION,
     }
+
+
+class HotReviewGateError(ValueError):
+    """热点来源选题未通过审核关卡（未筛查/未通过/信息不足），不得进入正式写作。"""
+
+
+def require_reviewed_hot_topic(topic) -> None:
+    """P0-3 写作门禁：热点来源选题必须携带已持久化的审核状态。
+
+    - hot_id 为空 → 放行（非热点来源）；
+    - approved → 放行；
+    - caution → 要求 topic.risks 已记录限制，否则拒绝；
+    - needs_review / rejected / 状态缺失 → 拒绝。
+    """
+    hot_id = getattr(topic, "hot_id", None)
+    if not hot_id:
+        return
+    status = getattr(topic, "hot_review_status", None)
+    if status == "approved":
+        return
+    if status == "caution":
+        if (getattr(topic, "risks", "") or "").strip():
+            return
+        raise HotReviewGateError(
+            f"热点 {hot_id} 审核为 caution 但选题未记录限制（risks 为空），不得进入写作")
+    if status in ("needs_review", "rejected"):
+        raise HotReviewGateError(f"热点 {hot_id} 审核未通过（{status}），不得进入写作")
+    raise HotReviewGateError(f"热点 {hot_id} 缺少审核状态（未执行筛查），不得进入写作")

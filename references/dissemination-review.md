@@ -28,7 +28,7 @@
 > - **审核结论**（review_result/review_issues）→ `data/schemas/audit.schema.json`
 > - **传播复盘**（effect/retro）→ `data/schemas/effect.schema.json`
 >
-> 在 M2 导入完成前，以下 16 字段格式仍是 `case_lib.py` 的现行契约，继续可用。
+> M2 导入已完成：以下 16 字段是 V1 遗留格式，作为 `data/case_library/cases.jsonl` 的**只读导入源**（`kb.py db import-legacy`），现行契约是 `CaseRecord` 等拆分子实体；旧格式不再作为写作/审核/复盘的运行时数据。
 
 ```json
 {

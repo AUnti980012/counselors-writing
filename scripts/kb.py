@@ -14,7 +14,8 @@
   cache status/lookup/purge        cache/ 四层命名空间（purge 默认 dry-run）
   fetch <url> [--backend]         抓取公开 URL：raw→清洗→分块→指针（正文不进 stdout）
   ingest [--file] [--url]         用户提供内容（粘贴/文件）→ 同一清洗分块管道
-  hotlist weibo|tophub [--top N]  热榜抓取（输出 JSON [{rank,title,heat,url}]，与 V1 一致）
+  hotlist weibo|tophub [--top N]  热榜抓取+内容风险筛查（V1 字段 + review_status；未筛查数据不得混入）
+  hot link --topic <id> --hot <ref>  把热点审核状态绑定到选题（P0-3 写作门禁）
   extract <document_id> --extractor case_facts|style_pattern|topic_signal
                                    LLM 提取→校验→自纠正→knowledge/artifact
                                    （三模式：--llm-cmd / --prompt-only / --result 回灌）
@@ -52,7 +53,7 @@ except ImportError as exc:  # 依赖缺失（pydantic 未安装）
     print("安装指引：python -m pip install 'pydantic>=2'", file=sys.stderr)
     sys.exit(EXIT_DEPENDENCY)
 
-KB_VERSION = "1.1.0"  # 3.1：新增 deai 去 AI 味门禁（零 LLM）+ audit deai 注入 + schema 1.2.0
+KB_VERSION = "1.2.0"  # 3.3：出稿审核门禁 + 审核截断 fail-closed + 热点写作门禁 + 提取截断留痕
 
 ENTITY_NAMES = sorted(ENTITIES)
 
@@ -468,10 +469,102 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
 
 def cmd_hotlist(args: argparse.Namespace) -> int:
-    """热榜抓取（输出 JSON [{rank,title,heat,url}]，与 V1 逐字段一致；xinbang 已按 C-01 移除）。"""
-    from core.hotlist import cli_main as hotlist_cli_main
+    """热榜抓取 + 内容风险筛查（P0-3）：输出 V1 字段 + 审核字段，未筛查数据不得混入。
 
-    return hotlist_cli_main([args.source, "--top", str(args.top)])
+    每条在 V1 字段（rank/title/heat/url）之上附加 review_status/risk_flags/
+    review_reason/review_method/reviewed_at，并持久化 hotlist_review artifact。
+    抓取成功（fetch_status=success）绝不等于审核通过（review_status=approved）。
+    """
+    from core.hotlist import FetchBlocked, fetch_tophub, fetch_weibo
+    from core.hotreview import review_hotspots
+    from core.hotspots import hot_id_for
+
+    try:
+        items = fetch_weibo(args.top) if args.source == "weibo" else fetch_tophub(args.top)
+    except FetchBlocked as exc:
+        alt = "tophub" if args.source == "weibo" else "weibo"
+        print(f"错误：{args.source} 抓取失败（{exc.reason}），请降级到 {alt} 或 WebSearch",
+              file=sys.stderr)
+        return EXIT_ERROR
+
+    snapshot = {
+        "status": "success",
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "sources": {args.source: {"status": "success", "count": len(items), "reason": ""}},
+        "failed_sources": [],
+        "total": len(items),
+        "items": [{
+            "id": hot_id_for(it.get("title", "")),
+            "title": it.get("title", ""),
+            "list_time": None,
+            "sources": [{"platform": args.source, "rank": it.get("rank"),
+                         "heat": it.get("heat"), "url": it.get("url", "")}],
+        } for it in items],
+        "schema_version": SCHEMA_VERSION,
+    }
+    result = review_hotspots(snapshot)  # 确定性筛查 + 落 hotlist_review artifact
+    out = []
+    for it in result["items"]:
+        src = it.get("sources") or [{}]
+        row = dict(src[0])
+        row.update({
+            "id": it.get("id"),
+            "title": it.get("title"),
+            "fetch_status": it.get("fetch_status"),
+            "review_status": it.get("review_status"),
+            "risk_flags": it.get("risk_flags", []),
+            "review_reason": it.get("review_reason", ""),
+            "review_method": it.get("review_method"),
+            "reviewed_at": it.get("reviewed_at"),
+        })
+        out.append(row)
+    _print_json(out)
+    return EXIT_OK
+
+
+def cmd_hot_link(args: argparse.Namespace) -> int:
+    """把最新热点快照里某条热点的审核状态绑定到选题（P0-3 关卡）。"""
+    from core.hotreview import (load_latest_review_for, review_content_hash,
+                                review_for_item)
+    from core.hotspots import HotRefError, load_latest_snapshot, resolve_ref
+
+    conn, repo = _open_repo()
+    try:
+        topic = repo.get_topic(args.topic)
+        if topic is None:
+            print(f"错误：topic 不存在：{args.topic}", file=sys.stderr)
+            return EXIT_ERROR
+        snap, _ = load_latest_snapshot()
+        try:
+            item, _idx = resolve_ref(snap, args.hot)
+        except HotRefError as exc:
+            print(f"错误：{exc}", file=sys.stderr)
+            return EXIT_ERROR
+        review, _review_aid = load_latest_review_for(review_content_hash(snap))
+        rv = review_for_item(review, item.get("id")) if review else None
+        if rv is None:
+            repo.save_topic(topic.model_copy(update={
+                "hot_id": item.get("id"),
+                "hot_review_status": "needs_review",
+                "hot_review_id": None,
+            }))
+            _print_json({"status": "linked", "topic_id": args.topic,
+                         "hot_id": item.get("id"),
+                         "review_status": "needs_review",
+                         "note": "无审核记录（未执行筛查），已标记 needs_review"})
+            return EXIT_OK
+        repo.save_topic(topic.model_copy(update={
+            "hot_id": item.get("id"),
+            "hot_review_status": rv.get("review_status"),
+            "hot_review_id": (review or {}).get("review_id") if review else None,
+        }))
+        _print_json({"status": "linked", "topic_id": args.topic,
+                     "hot_id": item.get("id"),
+                     "review_status": rv.get("review_status"),
+                     "review_id": (review or {}).get("review_id") if review else None})
+        return EXIT_OK
+    finally:
+        conn.close()
 
 
 # ---- M4：extract ----
@@ -889,6 +982,7 @@ def cmd_context_for_write(args):
 def cmd_write(args):
     """LLM 写作：白名单上下文 → DraftRecord（--llm-cmd / --result / --prompt-only）。"""
     from core.extract import LLMCallError, ResultBindingError, default_extraction_deps
+    from core.hotreview import HotReviewGateError
     from core.writer import WriteInputError, write
 
     input_digest = _request_digest("write", args.mapping, args.mode, args.model_mode,
@@ -936,6 +1030,9 @@ def cmd_write(args):
     except WriteInputError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return EXIT_ERROR  # 数据缺失（mapping/case/profile/style 不存在）exit 1
+    except HotReviewGateError as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        return EXIT_INVALID  # 热点审核门禁未通过 exit 2
     except ValueError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return EXIT_USAGE  # 用法错误（未知 mode）exit 4
@@ -950,8 +1047,8 @@ def cmd_write(args):
 
 def cmd_audit(args):
     """LLM 七项自查 + 标点门禁 → AuditRecord（单通道，C-07；三模式）。"""
-    from core.audit import (AuditInputError, _draft_fulltext, audit,
-                            build_audit_grounding, build_audit_prompt)
+    from core.audit import (AuditInputError, audit, build_audit_grounding,
+                            build_audit_prompt_with_budget, draft_fulltext)
     from core.extract import LLMCallError, ResultBindingError, default_extraction_deps
 
     input_digest = _request_digest("audit", args.draft, args.model_mode)
@@ -963,15 +1060,18 @@ def cmd_audit(args):
             if draft is None:
                 print(f"错误：draft 不存在：{args.draft}", file=sys.stderr)
                 return EXIT_ERROR
+            prompt, truncated, audited_chars = build_audit_prompt_with_budget(
+                draft_fulltext(draft), draft.title, args.model_mode,
+                mode=getattr(draft, "mode", "article") or "article",
+                grounding=build_audit_grounding(repo, draft))
             _print_json({"operation": "audit", "schema_version": SCHEMA_VERSION,
                          "request": {"draft_id": args.draft,
                                      "model_mode": args.model_mode},
                          "input_digest": input_digest,
                          "expected_output": "audit",
-                         "prompt": build_audit_prompt(
-                             _draft_fulltext(draft), draft.title, args.model_mode,
-                             mode=getattr(draft, "mode", "article") or "article",
-                             grounding=build_audit_grounding(repo, draft))})
+                         "truncated": truncated,
+                         "audited_chars": audited_chars,
+                         "prompt": prompt})
             return EXIT_OK
         finally:
             conn.close()
@@ -1063,9 +1163,12 @@ def cmd_deai(args):
 
 
 def cmd_output_render(args):
-    """draft → 最终 Markdown → FINAL artifact（零 LLM，换格式重渲染不重研究）。"""
+    """draft → 最终 Markdown → FINAL artifact（零 LLM，换格式重渲染不重研究）。
+
+    出稿审核门禁（P0-1）：非 --force 必须携带有效审核，否则拒绝渲染（exit 2）。
+    """
     from core.extract import default_extraction_deps
-    from core.output import OutputInputError, finalize
+    from core.output import AuditGateError, OutputInputError, finalize
 
     template = None
     if args.template:
@@ -1078,10 +1181,13 @@ def cmd_output_render(args):
     deps = default_extraction_deps()
     try:
         ptr = finalize(draft_id=args.draft, deps=deps, template=template,
-                       audit_id=args.audit)
+                       audit_id=args.audit, force=args.force)
     except OutputInputError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return EXIT_ERROR
+    except AuditGateError as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        return EXIT_INVALID  # 审核门禁未通过（与 audit 不通过一致 exit 2）
     finally:
         deps.conn.close()
     if args.content:
@@ -1367,10 +1473,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest.add_argument("--title", default="", help="可选标题（缺省自动提取）")
     p_ingest.set_defaults(func=cmd_ingest)
 
-    p_hot = sub.add_parser("hotlist", help="热榜抓取（输出与 V1 逐字段一致；xinbang 已移除）")
+    p_hot = sub.add_parser("hotlist", help="热榜抓取 + 内容风险筛查（V1 字段 + review_status 等）")
     p_hot.add_argument("source", choices=["weibo", "tophub"])
     p_hot.add_argument("--top", type=int, default=20, help="条目数上限（默认 20，Token 检查点 A）")
     p_hot.set_defaults(func=cmd_hotlist)
+
+    p_hot2 = sub.add_parser("hot", help="热点引用与选题绑定（P0-3 审核关卡）")
+    p_hot2_sub = p_hot2.add_subparsers(dest="sub", required=True)
+    p_hot_link = p_hot2_sub.add_parser("link", help="把最新热点快照的审核状态绑定到选题")
+    p_hot_link.add_argument("--topic", required=True, help="选题 id（top-*）")
+    p_hot_link.add_argument("--hot", required=True, help="热点序号 / hot-id / 标题子串")
+    p_hot_link.set_defaults(func=cmd_hot_link)
 
     # M4：extract
     p_ext = sub.add_parser("extract", help="LLM 结构化提取：document → 提取 → 校验 → 自纠正 → knowledge/artifact")
@@ -1494,7 +1607,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_render.add_argument("--draft", required=True, help="草稿 id")
     p_render.add_argument("--template",
                           help="自定义模板文件（{title}/{subtitle}/{sections}/{closing}）")
-    p_render.add_argument("--audit", help="可选审核 id（写进 metadata 血缘）")
+    p_render.add_argument("--audit", help="审核 id（出稿门禁：默认必填且须通过）")
+    p_render.add_argument("--force", action="store_true",
+                          help="强制跳过审核门禁（metadata 记录 forced=true 留痕，不得作为默认路径）")
     p_render.add_argument("--content", action="store_true", help="直接输出渲染文本到 stdout")
     p_render.set_defaults(func=cmd_output_render)
 

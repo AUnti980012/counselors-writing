@@ -9,11 +9,12 @@ from pathlib import Path
 
 from core import db
 from core.artifact import ArtifactStore, Registry
+from core.audit import draft_content_hash
 from core.cache import CacheManager
 from core.extract import ExtractionDeps
-from core.output import OutputInputError, finalize, render_draft
+from core.output import AuditGateError, OutputInputError, finalize, render_draft
 from core.repo import Repository
-from core.schema import DraftRecord
+from core.schema import AuditRecord, DraftRecord
 
 DRAFT = DraftRecord(
     draft_id="drf-out", title="十年后的你", subtitle="一封班会上的信",
@@ -39,6 +40,10 @@ class OutputTests(unittest.TestCase):
         self.deps = ExtractionDeps(repo=self.repo, store=self.store,
                                    cache=self.cache, conn=self.conn)
         self.repo.save_draft(DRAFT)
+        self.audit = AuditRecord(
+            audit_id="aud-out", draft_id="drf-out",
+            draft_content_hash=draft_content_hash(DRAFT), passed=True)
+        self.repo.save_audit(self.audit)
 
     def tearDown(self):
         self.conn.close()
@@ -61,7 +66,7 @@ class OutputTests(unittest.TestCase):
         self.assertIn("落款：文风：青年系", text)
 
     def test_finalize_creates_artifact(self):
-        ptr = finalize(draft_id="drf-out", deps=self.deps)
+        ptr = finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-out")
         self.assertEqual(ptr["status"], "success")
         self.assertEqual(ptr["entity"], "final_output")
         self.assertFalse(ptr["reused"])
@@ -74,8 +79,8 @@ class OutputTests(unittest.TestCase):
 
     def test_finalize_idempotent(self):
         """同 draft 同模板 → 同渲染文本 → artifact 幂等复用。"""
-        ptr1 = finalize(draft_id="drf-out", deps=self.deps)
-        ptr2 = finalize(draft_id="drf-out", deps=self.deps)
+        ptr1 = finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-out")
+        ptr2 = finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-out")
         self.assertTrue(ptr2["reused"])
         self.assertEqual(ptr1["artifact_id"], ptr2["artifact_id"])
 
@@ -100,7 +105,7 @@ class OutputTests(unittest.TestCase):
         import hashlib
         from core.preprocess import count_words
         rendered = render_draft(DRAFT)
-        ptr = finalize(draft_id="drf-out", deps=self.deps)
+        ptr = finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-out")
         self.assertEqual(ptr["status"], "success")
         self.assertEqual(ptr["char_count"], len(rendered.rstrip("\n")))
         self.assertEqual(ptr["word_count"], count_words(rendered))
@@ -112,10 +117,64 @@ class OutputTests(unittest.TestCase):
 
     def test_finalize_stats_based_on_final_file(self):
         """最终文件统计包含标题/落款/markdown，规模大于 draft 的 section 内容字数。"""
-        ptr = finalize(draft_id="drf-out", deps=self.deps)
+        ptr = finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-out")
         draft = self.repo.get_draft("drf-out")
         self.assertGreater(ptr["char_count"], draft.word_count,
                            "最终文件字数必须含标题/落款/markdown，不得沿用初稿 section 字数")
+
+    # ---- 出稿审核门禁（P0-1）：正向/反向 ----
+
+    def test_finalize_requires_audit(self):
+        """无审核记录 → 拒绝渲染（fail-closed）。"""
+        with self.assertRaises(AuditGateError):
+            finalize(draft_id="drf-out", deps=self.deps)
+
+    def test_finalize_rejects_nonexistent_audit(self):
+        with self.assertRaises(AuditGateError):
+            finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-nonexistent")
+
+    def test_finalize_rejects_other_drafts_audit(self):
+        """审核属于别的草稿 → 拒绝。"""
+        other = DraftRecord(draft_id="drf-other", title="别的",
+                            sections=[{"heading": "", "content": "内容。"}])
+        self.repo.save_draft(other)
+        self.repo.save_audit(AuditRecord(
+            audit_id="aud-other", draft_id="drf-other",
+            draft_content_hash=draft_content_hash(other), passed=True))
+        with self.assertRaises(AuditGateError):
+            finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-other")
+
+    def test_finalize_rejects_not_passed_audit(self):
+        self.repo.save_audit(AuditRecord(
+            audit_id="aud-fail", draft_id="drf-out",
+            draft_content_hash=draft_content_hash(DRAFT), passed=False))
+        with self.assertRaises(AuditGateError):
+            finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-fail")
+
+    def test_finalize_rejects_content_mismatch(self):
+        """草稿被修改后，旧审核的内容摘要不再匹配 → 拒绝。"""
+        self.repo.save_audit(AuditRecord(
+            audit_id="aud-stale", draft_id="drf-out",
+            draft_content_hash="0" * 64, passed=True))
+        with self.assertRaises(AuditGateError):
+            finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-stale")
+
+    def test_finalize_force_bypasses_gate(self):
+        """--force 跳过门禁但 metadata 留痕 forced=true，不推进草稿状态。"""
+        ptr = finalize(draft_id="drf-out", deps=self.deps, force=True)
+        self.assertEqual(ptr["status"], "success")
+        self.assertTrue(ptr["forced"])
+        rec = self.store.get(ptr["artifact_id"])
+        self.assertEqual(rec.metadata.get("forced"), "true")
+        self.assertNotEqual(self.repo.get_draft("drf-out").status, "final",
+                            "force 跳过不应把草稿标记为已终稿")
+
+    def test_finalize_with_valid_audit_advances_status(self):
+        """有效审核通过的出稿 → 草稿状态推进到 final（P1-7）。"""
+        ptr = finalize(draft_id="drf-out", deps=self.deps, audit_id="aud-out")
+        self.assertEqual(ptr["status"], "success")
+        self.assertFalse(ptr["forced"])
+        self.assertEqual(self.repo.get_draft("drf-out").status, "final")
 
 
 if __name__ == "__main__":

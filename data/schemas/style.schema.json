@@ -196,6 +196,12 @@
       "maxItems": 10,
       "title": "Tags",
       "type": "array"
+    },
+    "extraction_truncated": {
+      "default": false,
+      "description": "提取阶段素材被截断（下游审核应视为完整性存疑）",
+      "title": "Extraction Truncated",
+      "type": "boolean"
     }
   },
   "required": [

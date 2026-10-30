@@ -32,7 +32,7 @@ LLM 语义命令共 5 个，统一支持三种**互斥**模式：
 | `mapping --case <id> --profile <id>` | 案例 × 画像映射 | mapping |
 | `write --mapping <id> [--topic/--analysis/--style]` | 案例写作（白名单上下文） | draft |
 | `write --topic <id> [--mode ...] [--style/--profile/--sources]` | 通用写作（无 case/mapping） | draft |
-| `audit --draft <id>` | 单通道七项自查（按 draft.mode 措辞） | audit |
+| `audit --draft <id>` | 单通道八项自查 + 标点/去AI 门禁（按 draft.mode 措辞） | audit |
 
 三种模式（互斥，`argparse` 强制）：
 
@@ -51,7 +51,7 @@ Agent 判断该走哪条写作路径：
 | 输入 | 路径 |
 |---|---|
 | 含真实学生案例（谈心/班会/学生事件） | **Case-based**：`extract case_facts` → `analysis`（按需）→ `mapping` → `write --mapping` |
-| 无学生案例，但明确要政策/热点/指南/公共主题/通用文章 | **Generic**：`extract topic_signal`（Content Brief）→ `write --topic` |
+| 无学生案例，但明确要政策/热点/指南/公共主题/通用文章 | **Generic**：`extract topic_signal`（Content Brief）→（热点来源须 `kb.py hot link` 绑定审核）→ `write --topic` |
 | 不确定 | 先做最小 Topic/Brief 分析，**不要直接跑完整 Pipeline** |
 
 - Generic 写作**不需要 Case/Mapping**，结果直接落 DraftRecord（lineage 记录 `topic_id + source_ids`）。
@@ -66,7 +66,7 @@ Agent 判断该走哪条写作路径：
 ```json
 {
   "operation": "analysis",
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "request": { "case_ids": ["case-..."] },
   "input_digest": "…request 绑定摘要…",
   "expected_output": "analysis",

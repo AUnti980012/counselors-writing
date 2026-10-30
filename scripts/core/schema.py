@@ -466,6 +466,8 @@ class CaseRecord(StampedRecord):
     source_claims: List[FactClaim] = Field(default_factory=list, max_length=50)
     ai_inferences: List[FactClaim] = Field(default_factory=list, max_length=50)
     tags: List[str] = Field(default_factory=list, max_length=10, description="检索标签（单条 ≤50 字符；M5 检索元数据过滤用）")
+    extraction_truncated: bool = Field(default=False,
+                                       description="提取阶段素材被截断（下游审核应视为完整性存疑，不得当完整素材核验）")
 
     @field_validator("tags")
     @classmethod
@@ -540,6 +542,8 @@ class StyleRecord(StampedRecord):
     content_hash: Optional[HashStr] = None
     usage_count: int = Field(default=0, ge=0)
     tags: List[str] = Field(default_factory=list, max_length=10)
+    extraction_truncated: bool = Field(default=False,
+                                       description="提取阶段素材被截断（下游审核应视为完整性存疑）")
 
     @field_validator("sentence_features", "paragraph_features", "title_patterns", "opening_patterns",
                      "ending_patterns", "narrative_patterns", "communication_features")
@@ -590,6 +594,13 @@ class TopicRecord(StampedRecord):
                                      description="标题备选（悬念/反问/故事三类各至少一个时由上层约束）")
     hook: str = Field(default="", max_length=500, description="开头钩子")
     value_landing: str = Field(default="", max_length=500, description="升华落点")
+    extraction_truncated: bool = Field(default=False,
+                                       description="提取阶段素材被截断（下游审核应视为完整性存疑）")
+    # 热点溯源（P0-3）：来自 /cw-hot 的选题必须携带已持久化的审核状态，
+    # 写入写作门禁据此拒绝未筛查/未通过的热点进入正式写作。
+    hot_id: Optional[IdStr] = Field(default=None, description="来源热点稳定标识（hot-<12hex>）")
+    hot_review_status: Optional[REVIEW_STATUS] = Field(default=None, description="热点内容风险筛查结果")
+    hot_review_id: Optional[IdStr] = Field(default=None, description="热点筛查运行 id（hrv-*）")
 
 
 # ---- 实体 9：Analysis ----
@@ -771,6 +782,12 @@ class AuditRecord(StampedRecord):
     risk_check: CheckGroup = CheckGroup()
     passed: bool = True
     summary: str = Field(default="", max_length=1000)
+    # 审核覆盖（P0-1/P0-2）：绑定「审核 → 当前草稿」的内容摘要 + 实际审核范围。
+    # 均为 Python 托管字段（LLM 不可填）；旧审核记录缺省为空，出稿门禁会据此拒绝。
+    draft_content_hash: str = Field(default="", max_length=64,
+                                    description="被审核草稿的 canonical 正文 sha256（绑定审核对象）")
+    audited_chars: int = Field(default=0, ge=0, description="实际进入审核 prompt 的正文字符数")
+    truncated: bool = Field(default=False, description="正文超单次上下文容量被截断（截断即不得通过）")
 
     @model_validator(mode="after")
     def _verdict_rule(self) -> "AuditRecord":
@@ -881,6 +898,11 @@ class ExtractionRecord(StampedRecord):
     validation_errors: List[Dict[str, str]] = Field(default_factory=list, max_length=50,
                                                     description="[{path,message,type}]（机器可读，供自纠正循环消费）")
     model_metadata: ModelMetadata = ModelMetadata()
+    # 提取范围（P1-5）：记录实际注入的素材范围与截断状态，避免不完整素材被误认为完整。
+    truncated: bool = Field(default=False, description="素材（字符预算或块数）被截断")
+    input_chars: int = Field(default=0, ge=0, description="实际注入 prompt 的素材字符数")
+    included_chunks: int = Field(default=0, ge=0, description="实际注入的 chunk 数")
+    total_chunks: int = Field(default=0, ge=0, description="输入的 chunk 总数")
 
     @field_validator("input_refs", "output_refs")
     @classmethod

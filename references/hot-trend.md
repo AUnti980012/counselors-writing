@@ -4,7 +4,7 @@
 
 ## 一、主路径（默认）：第三方热榜站
 
-稳定、零风控风险，优先用（M3 起统一入口 `kb.py hotlist`，输出 JSON `[{rank,title,heat,url}]` 与 V1 逐字段一致；抓取原始响应自动落 `cache/raw` 幂等复用，合规重试 ×3 退避 2/4/8s）：
+稳定、零风控风险，优先用（M3 起统一入口 `kb.py hotlist`，输出 V1 字段 `[{rank,title,heat,url}]` + 内容风险筛查字段 `review_status/risk_flags/review_reason/review_method/reviewed_at`，并落 `hotlist_review` artifact；抓取原始响应自动落 `cache/raw` 幂等复用，合规重试 ×3 退避 2/4/8s）：
 
 | 源 | 说明 | 抓取方式 |
 |---|---|---|
@@ -24,6 +24,12 @@ python scripts/kb.py hotlist tophub --top 20     # 聚合多榜
 ## 二、热点 → 选题桥接 prompt（避免硬蹭）
 
 > **前置审核关卡**：桥接前必须经 `/cw-hot`（`scripts/cw.py hot`）内容风险筛查，只对 `review_status=approved`（或明确标注限制的 `caution`）条目做桥接；`needs_review`/`rejected`/`unscreened` 条目不得进入桥接 prompt。
+>
+> **审核状态绑定（P0-3）**：选题由热点派生后，必须把该热点的审核状态写进 TopicRecord，写作门禁才会放行：
+> ```bash
+> python scripts/kb.py hot link --topic <topic_id> --hot <序号|hot-id|标题子串>
+> # approved → 放行；caution → 要求 topic.risks 已记录限制；needs_review/rejected/缺失 → kb.py write 拒绝
+> ```
 
 ```text
 下面是今日热点榜单（JSON）和我要写的素材。请找 1-2 个「热点与学生工作的真实接口」：

@@ -255,6 +255,59 @@
       "maxLength": 500,
       "title": "Value Landing",
       "type": "string"
+    },
+    "extraction_truncated": {
+      "default": false,
+      "description": "提取阶段素材被截断（下游审核应视为完整性存疑）",
+      "title": "Extraction Truncated",
+      "type": "boolean"
+    },
+    "hot_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "来源热点稳定标识（hot-<12hex>）",
+      "title": "Hot Id"
+    },
+    "hot_review_status": {
+      "anyOf": [
+        {
+          "enum": [
+            "approved",
+            "caution",
+            "needs_review",
+            "rejected"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "热点内容风险筛查结果",
+      "title": "Hot Review Status"
+    },
+    "hot_review_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "热点筛查运行 id（hrv-*）",
+      "title": "Hot Review Id"
     }
   },
   "required": [

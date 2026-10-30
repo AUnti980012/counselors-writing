@@ -1,12 +1,12 @@
 ---
 name: counselors-writing
-description: 帮助高校辅导员（大学辅导员、班主任、思政工作者）把日常工作素材——一次谈心谈话、一场班会、一个学生事件——写成公众号爆款推文，并沉淀成越用越懂学校、越用越懂学生的案例库。当用户需要研究人民日报、光明日报、中国青年报的话术与文风（爆款研究/仿写）、做选题转化（判断学生真正关心什么、找矛盾冲突、从成长/选择/责任/关系/家国情怀切入）、抓取微博热搜/tophub 热点、撰写推文并边写边做思政质检（政治方向/事实依据/价值表达/学生隐私/标签化语言/版权风险/AI痕迹七项）、或做传播复盘时，都应使用本 skill。触发词：辅导员、大学辅导员、辅导员公众号、公众号推文、爆款、爆款文章、标题、仿写、选题、热点、思政、谈心谈话、班会、学生工作、育人故事、校园公众号、传播复盘。
+description: 帮助高校辅导员（大学辅导员、班主任、思政工作者）把日常工作素材——一次谈心谈话、一场班会、一个学生事件——写成公众号爆款推文，并沉淀成越用越懂学校、越用越懂学生的案例库。当用户需要研究人民日报、光明日报、中国青年报的话术与文风（爆款研究/仿写）、做选题转化（判断学生真正关心什么、找矛盾冲突、从成长/选择/责任/关系/家国情怀切入）、抓取微博热搜/tophub 热点、撰写推文并做思政质检（政治方向/事实依据/价值表达/学生隐私/标签化语言/版权风险/AI痕迹/格式八项）、或做传播复盘时，都应使用本 skill。触发词：辅导员、大学辅导员、辅导员公众号、公众号推文、爆款、爆款文章、标题、仿写、选题、热点、思政、谈心谈话、班会、学生工作、育人故事、校园公众号、传播复盘。
 license: MIT
-compatibility: "需要 Python 3.10+ + pydantic>=2（可选 readability-lxml + html2text）；抖音/动态页需 Node.js 22+ 与 web-access 的 CDP 代理；思政质检单通道（七项结构化自查 + 标点门禁）；无任何 Agent 平台专属依赖"
+compatibility: "需要 Python 3.10+ + pydantic>=2（可选 readability-lxml + html2text）；抖音/动态页需 Node.js 22+ 与 web-access 的 CDP 代理；思政质检单通道（八项结构化自查 + 标点/去AI 确定性门禁）；无任何 Agent 平台专属依赖"
 metadata:
   audience: 高校辅导员
   display_name: "Counselors-Writing"
-  version: "3.2.0"
+  version: "3.3.0"
 ---
 
 # Counselors-Writing（辅导员爆款文章）
@@ -24,7 +24,7 @@ metadata:
 | 仿写 / 研究报媒文风 | `references/style-library.md` | 否 |
 | 素材转选题 / 判断学生关心什么 | `references/topic-selection.md` | 否 |
 | 抓热点 / 微博热搜 / tophub / 抖音 | `references/hot-trend.md` | 否 |
-| 写推文 / 成文 / 边写边审 | `references/writing-companion.md` | 是 |
+| 写推文 / 成文 / 写作与质检分离 | `references/writing-companion.md` | 是 |
 | 思政质检 / 审校 | `references/ideological-review.md` | 否 |
 | 复盘 / 传播效果 | `references/dissemination-review.md` | 否 |
 
@@ -48,8 +48,8 @@ metadata:
 
 ### 两条路径共同收口
 
-6. **过门**：`kb.py punctuation --lang zh <正文>` + `kb.py deai <正文>`（零 LLM 确定性门禁）+ `kb.py audit --draft <id>`（七项自查，按 draft.mode 措辞）。
-7. **交付**：`kb.py output render --draft <id> --audit <audit_id>`（`--audit` 把审核 id 写进 final_output 血缘，audited output 应带；换格式重渲染可省略）。
+6. **过门**：`kb.py punctuation --lang zh <正文>` + `kb.py deai <正文>`（零 LLM 确定性门禁）+ `kb.py audit --draft <id>`（八项结构化自查 + 标点/去AI，按 draft.mode 措辞；正文截断即不通过）。
+7. **交付**：`kb.py output render --draft <id> --audit <audit_id>`（`--audit` **必填**：审核必须存在、属当前草稿、已通过、内容摘要一致；确需跳过用 `--force` 并在血缘留痕 forced=true）。
 8. **复盘沉淀**：`kb.py case add` / `kb.py style add`（不阻塞交付）。
 
 ## 4. Hard Rules
@@ -57,7 +57,7 @@ metadata:
 - **学生隐私硬门槛**：命中即脱敏改写（改名/去学号/模糊事件组合）；无法脱敏则提示「不建议公开」。
 - **事实/推断强制分离**：documented_fact/source_claim 必带 evidence_ids；ai_inference/derived_pattern/recommendation 必带 basis；拿不准标「待核实」。
 - **Mapping 仅案例写作需要**：Generic 写作不需要 Case/Mapping；除非用户明确要求「结合本校画像」才投影 profile。严禁把 Generic 内容捏造成学生案例。
-- **禁止默认把整库/raw HTML/无关历史材料/重复上下文回流进 LLM**：两级检索（L1 紧凑投影 / L2 显式 `--get`）+ 指针优先，正文/raw 只落盘不回流。**唯一例外**：审核当前 Draft 时，允许把「当前待审核正文」作为必要全文输入，且受明确字符上限约束（audit `MAX_PROMPT_CHARS`=8000），不夹带整库/历史/无关来源。
+- **禁止默认把整库/raw HTML/无关历史材料/重复上下文回流进 LLM**：两级检索（L1 紧凑投影 / L2 显式 `--get`）+ 指针优先，正文/raw 只落盘不回流。**唯一例外**：审核当前 Draft 时，允许把「当前待审核正文」作为必要全文输入，且正文优先、来源片段先缩、超单次上下文容量即截断并强制不通过（绝不静默截断后放行）。
 - **禁止绕过登录/验证码/IP 限制/付费墙/Bot 检测**：403/429 → 有限重试 → 官方替代源 → 用户提供内容。
 - **复盘沉淀是条件触发，不是每次交付的必经步骤**：只有存在新的传播数据 / 用户反馈 / 有效写法 / 失败原因等增量时才沉淀；无增量直接结束，不额外调用 LLM、不强制写回知识库。
 

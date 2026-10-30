@@ -12,7 +12,7 @@
 | `/cw-hot` | 抓取多源热点、去重、评估选题价值 | implemented |
 | `/cw-research` | 资料研究与证据整理 | implemented |
 | `/cw-write` | 一站式写作（自动决定最小流水线） | implemented |
-| `/cw-audit` | 独立文章审核（七项思政 + 确定性门禁） | implemented |
+| `/cw-audit` | 独立文章审核（八项思政 + 标点/去AI 确定性门禁） | implemented |
 | `/cw-topic` | 选题分析 → TopicRecord | implemented |
 | `/cw-revise` | 文章修订 | partial（无独立 revise CLI，语义项 LLM 编排） |
 | `/cw-library` | 知识库检索/复用/入库 | implemented |
@@ -61,7 +61,7 @@ Codex（v0.117.0 起）已移除 slash commands。`/cw-*` 等价能力通过两�
 1. **skill 自然语言路由**：`~/.agents/skills/counselors-writing/SKILL.md` 已按意图
    路由到各 references（与 `/cw-*` 一一对应）；
 2. **薄 CLI 直调**：`python scripts/cw.py hot|specs|help` 与
-   `python scripts/kb.py <28 子命令>`，Agent 直接编排。
+   `python scripts/kb.py <27 子命令>`，Agent 直接编排。
 
 Codex 侧无需复制本目录文件；若未来 Codex 恢复 command 入口，按 Claude Code
 同样方式接线即可。

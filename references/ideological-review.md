@@ -1,10 +1,10 @@
-# 思政质检：单通道七项检查
+# 思政质检：单通道八项检查
 
-文章输出前**必须**过这道门。七项全查，逐条勾，任何一项「风险/不通过」都要提示修改，不能放行。目标是「既有流量意识，更有育人尺度」。
+文章输出前**必须**过这道门。八项全查，逐条勾，任何一项「风险/不通过」都要提示修改，不能放行。目标是「既有流量意识，更有育人尺度」。
 
-> M6 起（C-07）：思政第二意见已删除，质检收敛为**单通道**——七项结构化自查 + 标点门禁，只把当前 Draft 正文传给审核模型**一次**（有界，audit `MAX_PROMPT_CHARS`=8000），不外传第二模型、不夹带整库/历史材料。本文件是七项清单的**唯一规则源**；审核已命令化为 `kb.py audit`（机器可读 AuditRecord）。
+> M6 起（C-07）：思政第二意见已删除，质检收敛为**单通道**——八项结构化自查 + 标点/去AI 门禁，只把当前 Draft 正文传给审核模型。正文优先、来源片段先缩（`AUDIT_BODY_CHARS`/`AUDIT_GROUNDING_CHARS` 分预算）；正文超单次上下文容量即截断并强制 `passed=false`（绝不静默截断后放行）。本文件是八项清单的**唯一规则源**；审核已命令化为 `kb.py audit`（机器可读 AuditRecord）。
 
-## 一、七项可勾选 checklist
+## 一、八项可勾选 checklist
 
 ### 1. 政治方向
 - [ ] 有无与社会主义核心价值观、党的教育方针相悖或可被误解的表述
@@ -45,22 +45,27 @@
 - [ ] 语言是否像真人辅导员在和学生说话
 - [ ] 机械项（模板连接词 / 套话收尾 / 进行+动词 / 限定词堆叠 / emoji / em-dash / 半角标点）由确定性门禁 `kb.py deai` + `kb.py punctuation` 兜底（零 LLM，见 `references/de-ai.md`）
 
+### 8. 格式 + 内容契约
+- [ ] 标题核心问题是否在正文得到回答（标题承诺解读具体事件而正文未解释 → 判 warn/fail）
+- [ ] 选题核心冲突与价值落点是否在正文体现
+- [ ] 科普/指南文是否给出可执行方法
+
 ## 二、结论与处理
 
-- **通过**：七项全过，可交付。
-- **部分通过**：列出「必须改的项」，改完复查对应项后再交付。
+- **通过**：八项全过，可交付。
+- **部分通过**：列出「必须改的项」，改完整体重审（无「只复查对应项」的增量机制——任何事实/结构改动都需重新 `kb.py audit`）。
 - **不通过**：政治方向 / 隐私 / 事实依据任一「不通过」即判定不通过，退回重写对应部分，不交付。
 
 ## 三、命令化（M6）
 
 ```bash
-# 单通道审核：七项结构化自查（LLM）+ 标点门禁（确定性，零 LLM）
+# 单通道审核：八项结构化自查（LLM）+ 标点/去AI 门禁（确定性，零 LLM）
 python scripts/kb.py audit --draft <draft_id> --llm-cmd "<LLM_COMMAND>"
 # 无 LLM CLI 时：--prompt-only 输出审核 prompt 由 Agent 编排，再 --result 回灌
 python scripts/kb.py audit --draft <draft_id> --prompt-only
 python scripts/kb.py audit --draft <draft_id> --result 审核结果.json
 
-# 标点门禁可独立跑（exit 0 通过 / 2 有 findings 或 ko 暂不支持）
+# 标点门禁可独立跑（exit 0 通过 / 2 有 findings；--lang 只接受 zh/en/ja/auto）
 python scripts/kb.py punctuation <正文文件>
 
 # 去 AI 味门禁可独立跑（exit 0 通过 / 2 有 findings）
@@ -68,8 +73,8 @@ python scripts/kb.py deai <正文文件>
 python scripts/kb.py deai --fix <正文文件>
 ```
 
-verdict 硬规则（代码级强制）：political / factual / privacy 任一 `fail` → `AuditRecord.passed=false`；任一检查分组未通过 → `passed=false`。审核输出为机器可读 `AuditRecord`（`data/schemas/audit.schema.json`）。
+verdict 硬规则（代码级强制）：political / factual / privacy 任一 `fail` → `AuditRecord.passed=false`；任一检查分组未通过 → `passed=false`；正文截断（`AuditRecord.truncated=true`）→ `passed=false`。审核输出为机器可读 `AuditRecord`（`data/schemas/audit.schema.json`）。
 
 ## 四、质检报告模板
 
-见 `assets/review-report-template.md`。单栏呈现七项结果与结论。
+见 `assets/review-report-template.md`。单栏呈现八项结果与结论。

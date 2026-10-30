@@ -307,6 +307,62 @@ class AuditTests(unittest.TestCase):
         factual = [i for i in rec.issues if i.check == "factual"]
         self.assertEqual(factual[0].verdict, "fail")
 
+    # ---- 加固回归：审核截断 fail-closed（P0-2） ----
+
+    def test_audit_truncation_blocks_pass(self):
+        """正文超单次上下文容量 → truncated=true + passed=false（绝不静默放行）。"""
+        # 单 section 上限 5000 字符，用多段凑够 > AUDIT_BODY_CHARS（10000）
+        long_sections = [{"heading": f"第{i}段", "content": "正文" * 2000}
+                         for i in range(3)]
+        self.repo.save_draft(DraftRecord(
+            draft_id="drf-long", title="长文", sections=long_sections))
+        llm = self._llm([json.dumps(VALID_AUDIT, ensure_ascii=False)])
+        ptr = audit(draft_id="drf-long", llm_fn=llm, deps=self.deps)
+        self.assertEqual(ptr["status"], "success")
+        self.assertFalse(ptr["passed"], "正文截断必须阻止通过")
+        rec = self.repo.get_audit(ptr["audit_id"])
+        self.assertTrue(rec.truncated)
+        self.assertGreater(rec.audited_chars, 0)
+        self.assertIn("审核覆盖不完整", rec.format_check.notes or "")
+
+    def test_audit_records_draft_content_hash(self):
+        """审核记录绑定被审核草稿的内容摘要（P0-1 出稿门禁依据）。"""
+        from core.audit import draft_content_hash
+        llm = self._llm([json.dumps(VALID_AUDIT, ensure_ascii=False)])
+        ptr = audit(draft_id="drf-x", llm_fn=llm, deps=self.deps)
+        rec = self.repo.get_audit(ptr["audit_id"])
+        self.assertEqual(rec.draft_content_hash,
+                         draft_content_hash(self.repo.get_draft("drf-x")))
+
+    # ---- 加固回归：事实性断言不因 claims 为空逃过（P1-9） ----
+
+    def test_factual_assertion_detector(self):
+        from core.audit import _body_has_factual_assertion
+        self.assertTrue(_body_has_factual_assertion("2024年有80%的毕业生选择考研。"))
+        self.assertTrue(_body_has_factual_assertion("教育部公布新增300万元资助。"))
+        self.assertFalse(_body_has_factual_assertion("辅导员要多和学生谈心。"))
+
+    def test_factual_assertion_gate_downgrades_without_evidence(self):
+        from core.audit import _apply_factual_gate
+        issues = [{"check": "factual", "verdict": "pass", "note": "ok",
+                   "location": "", "evidence_ids": []}]
+        out = _apply_factual_gate(issues,
+                                  {"factual_risk": False, "verified_evidence": False},
+                                  body_has_factual_assertion=True)
+        self.assertEqual(out[0]["verdict"], "fail",
+                         "正文含事实断言且零证据 → factual 不得 pass（claims 为空也逃不过）")
+
+    def test_factual_assertion_gate_end_to_end(self):
+        """正文含事实断言、零来源零证据、claims 为空 → 审核 passed=false。"""
+        self.repo.save_draft(DraftRecord(
+            draft_id="drf-fact", title="考研数据",
+            sections=[{"heading": "", "content": "2024年全国考研报名人数达438万。"}],
+            claims=[]))
+        llm = self._llm([json.dumps(VALID_AUDIT, ensure_ascii=False)])
+        ptr = audit(draft_id="drf-fact", llm_fn=llm, deps=self.deps)
+        self.assertEqual(ptr["status"], "success")
+        self.assertFalse(ptr["passed"], "无证据的事实性断言不得以确定性事实通过")
+
 
 if __name__ == "__main__":
     unittest.main()

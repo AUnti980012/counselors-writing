@@ -2,6 +2,34 @@
 
 本仓库按 `docs/history/milestone-pack-v1.0.md` 的 M0→M9 协议演进。里程碑细节见 `docs/history/migration-plan.md`。
 
+## [3.3.0] - 2026-10-30
+
+出稿审核硬门禁 + 热点关卡统一 + 审核/提取截断 fail-closed（修复《仓库审查报告》P0/P1/P2）。
+
+### 版本号
+
+| 版本 | 值 | 含义 |
+|---|---|---|
+| Skill | **3.3.0** | 出稿必须过审（`output render --audit` 必填）、热点关卡统一、截断即不通过（用户可见行为） |
+| KB | **1.2.0** | 新增 `hot link`、`hotlist` 附审核状态、`output render --force`、`write --topic` 热点门禁（CLI 接口） |
+| Schema | 1.2.0（不变） | 仅新增可选字段（audit 覆盖字段、topic 热点溯源、extraction 范围、case/style/topic extraction_truncated），向后兼容 |
+| DB | 3（不变） | 无 migration |
+
+### 变更
+
+- **M12/M13 + `/database-check`（随本版正式发布）**：11 条 `/cw-*` Slash Command Layer（`commands/` + `scripts/cw.py` + `commands.py`）、`/cw-hot` 热点内容风险筛查（`hotreview.py`，确定性 + 语义复核）、`/database-check` 可视化档案阵列（`database_check.py`）。这些在 3.2.0-beta 之后已并入 main，本版作为正式版一并发布。
+- **P0-1 出稿审核硬门禁**：`output.py::finalize` 强制校验 `--audit`（存在/属当前草稿/passed/`draft_content_hash` 一致），任一不满足抛 `AuditGateError`（exit 2）；`--force` 跳过但血缘 metadata 留痕 `forced=true`。`AuditRecord` 新增 `draft_content_hash`/`audited_chars`/`truncated`。
+- **P0-2 审核截断 fail-closed**：`build_audit_prompt_with_budget` 正文优先（`AUDIT_BODY_CHARS=10000`）、来源片段先缩（`AUDIT_GROUNDING_CHARS=1200`）；正文超限 → `truncated=true` 并强制 `passed=false`，绝不静默截断后放行。
+- **P0-3 热点关卡统一**：`kb.py hotlist` 输出附加审核状态并落 `hotlist_review`；新增 `kb.py hot link` 把热点审核状态绑定到 `TopicRecord`；`write --topic` 对未筛查/未通过热点 fail-closed（`require_reviewed_hot_topic`）。
+- **P1**：隐私正则新增班级/宿舍；提取截断写入 `ExtractionRecord` 与实体并联动审核；草稿状态机接通（audit 通过→reviewed、出稿→final）；正文事实性断言不因 `claims` 为空逃过 factual gate。
+- **P2**：README/SKILL/AGENTS/references/docs 版本号、命令数、模块数、schema 版本、共享 $defs 数、「七项→八项」等漂移逐项修正。
+
+### 测试
+
+- 全量 **609**（588 → +21：出稿门禁 7、审核截断/事实断言 4、热点门禁 6、隐私/提取截断 2、写作门禁 1，另 M12/M13 骨架）。
+- `kb.py schemas export --check` 零漂移。
+- 未做真实 LLM/网络端到端验证（均 mock）；出稿/审核/热点门禁由 mock LLM 回归锁定。
+
 ## [3.2.0] - 2026-10-10
 
 成稿审核与事实校验加固（Beta）。修复「深圳社保补缴」案例暴露的审核缺项、事实证据不足、选题风险未贯穿、交付统计不一致问题。

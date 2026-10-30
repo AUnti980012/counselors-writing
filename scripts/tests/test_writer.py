@@ -250,5 +250,17 @@ class WriterTests(unittest.TestCase):
         self.assertIn("白描开头、对话还原、金句收尾。", prompt, "style structure 必须进入 prompt")
 
 
+    def test_write_topic_rejects_unreviewed_hot_topic(self):
+        """P0-3：热点来源选题未通过审核 → 写作拒绝（fail-closed，不进入 LLM）。"""
+        from core.hotreview import HotReviewGateError
+        from core.schema import TopicRecord
+        from core.writer import write
+        self.repo.save_topic(TopicRecord(
+            topic_id="top-hot", title="某热点", summary="热点",
+            hot_id="hot-000000000001", hot_review_status="needs_review"))
+        with self.assertRaises(HotReviewGateError):
+            write(topic_id="top-hot", llm_fn=self._llm(["{}"]), deps=self.deps)
+
+
 if __name__ == "__main__":
     unittest.main()

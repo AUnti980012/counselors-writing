@@ -5,7 +5,8 @@
 ## 一、画像存哪
 
 ```
-data/profiles/school.json
+data/knowledge/profiles/pro-school.json   # 当前画像（kb.py profile get/set/dump 读写）
+data/profiles/school.json                 # V1 旧三文件之一，只读导入源（不原地改写）
 ```
 
 ## 二、字段

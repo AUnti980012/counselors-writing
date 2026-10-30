@@ -27,6 +27,7 @@ from core.errors import ErrorDetail
 from core.extract import (ExtractionDeps, _redact_pii, _redact_pii_recursive,
                           _self_correct_prompt, _to_errors, default_extraction_deps,
                           parse_llm_json, preflight_binding, schema_summary)
+from core.hotreview import require_reviewed_hot_topic
 from core.mapping import _profile_projection
 from core.schema import SCHEMA_VERSION
 from core.validate import MAX_SELF_CORRECT
@@ -652,6 +653,8 @@ def _write_generic(*, topic_id: str, llm_fn: Callable[[str], str],
     topic = deps.repo.get_topic(topic_id)
     if topic is None:
         raise WriteInputError(f"topic 不存在：{topic_id}（先 kb.py extract --extractor topic_signal 产出选题）")
+    # P0-3：热点来源选题的审核门禁（未筛查/未通过不得进入正式写作）
+    require_reviewed_hot_topic(topic)
     style = deps.repo.get_style(style_id) if style_id else None
     if style_id and style is None:
         raise WriteInputError(f"style 不存在：{style_id}")
