@@ -18,12 +18,12 @@
 3. **全文初稿后过门**：
    - 标点门禁（确定性，零 LLM）：`python3 scripts/kb.py punctuation --lang zh <file>`（exit 0 = 通过 / 2 = 有 findings 或 ko 暂不支持）。
    - 去 AI 味门禁（确定性，零 LLM）：`python3 scripts/kb.py deai <file>` 检查、`--fix` 得修正文本（见 `references/de-ai.md`）。
-   - 思政七项结构化自查：`python3 scripts/kb.py audit --draft <draft_id> --llm-cmd "<LLM_COMMAND>"`（或 `--prompt-only`/`--result` 由 Agent 编排；见 `references/ideological-review.md`）。
-4. **汇总输出**：七项自查结果 + 标点门禁合并成质检报告（模板 `assets/review-report-template.md`，单栏），给「通过 / 需修改（列必改项）/ 不通过」，把修改落实进正文后再交付。
+   - 思政八项结构化自查：`python3 scripts/kb.py audit --draft <draft_id> --llm-cmd "<LLM_COMMAND>"`（或 `--prompt-only`/`--result` 由 Agent 编排；见 `references/ideological-review.md`）。
+4. **汇总输出**：八项自查结果 + 标点门禁合并成质检报告（模板 `assets/review-report-template.md`，单栏），给「通过 / 需修改（列必改项）/ 不通过」，修改正文后重新审核，再交付。
 
 ## 三、可选增强（不作为默认依赖）
 
-运行环境支持 subagent 时，主 agent 写正文的同时，spawn 一个只读审校 subagent 并行跑七项质检。默认**不**依赖它——分阶段自查 + 标点门禁 + 结构化审核已能独立闭环，subagent 只是加分项。
+运行环境支持 subagent 时，主 agent 写正文的同时，spawn 一个只读审校 subagent 并行跑八项质检。默认**不**依赖它——分阶段自查 + 标点门禁 + 结构化审核已能独立闭环，subagent 只是加分项。
 
 ## 四、去 AI 味贯穿全程
 

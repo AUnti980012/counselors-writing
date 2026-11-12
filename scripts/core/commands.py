@@ -66,18 +66,18 @@ _COMMON = {
     },
     "cw-audit": {
         "name": "/cw-audit",
-        "purpose": "独立文章审核：对 draft 或文章文件做七项思政自查 + 确定性门禁",
+        "purpose": "独立文章审核：草稿八项思政自查与确定性检查",
         "inputs": ["draft id", "文章文件路径", "已有 audit/draft artifact"],
         "routing": [
-            "draft → python scripts/kb.py audit --draft <id>（七项 LLM 自查 + 标点/去AI 门禁）",
+            "draft → python scripts/kb.py audit --draft <id>（八项 LLM 自查 + 标点/去AI 门禁）",
             "文章文件 → kb.py punctuation --lang zh <file> + kb.py deai <file>（确定性门禁，零 LLM）",
-            "七项清单唯一规则源：references/ideological-review.md",
+            "八项清单唯一规则源：references/ideological-review.md",
         ],
         "outputs": ["AuditRecord（verdict 由 Python 硬规则计算，不信任模型自报）",
                     "严格区分 作者自查 / 模型审核 / 确定性程序门禁 / 独立证据核验",
                     "标题/正文/声明一致性检查（格式项 format）"],
         "status": "implemented",
-        "notes": "对独立文章文件仅确定性门禁可直接跑；七项结构化 AuditRecord 需要 draft（kb.py audit 的契约输入）；缺检查项不得通过（八项 LLM 自查必须齐全且唯一）",
+        "notes": "对独立文章文件仅确定性门禁可直接跑；八项结构化 AuditRecord 需要 draft（kb.py audit 的契约输入）；八项自查必须齐全且唯一，正文覆盖不完整时审核不通过",
     },
     "cw-topic": {
         "name": "/cw-topic",
@@ -121,14 +121,14 @@ _COMMON = {
     },
     "cw-export": {
         "name": "/cw-export",
-        "purpose": "成果导出：从已完成 artifact 生成 Markdown 等既有格式",
-        "inputs": ["draft id", "audit id（可选，写入血缘）", "目标格式"],
+        "purpose": "成果导出：将审核通过的草稿生成 Markdown 成稿",
+        "inputs": ["draft id", "当前草稿已通过的 audit id"],
         "routing": [
-            "python scripts/kb.py output render --draft <id> [--audit <audit_id>]（零 LLM）",
+            "python scripts/kb.py output render --draft <id> --audit <audit_id>（零 LLM）",
         ],
         "outputs": ["FINAL Markdown artifact（路径/文件名/正文哈希/版本/统计取自最终文件）"],
         "status": "partial",
-        "notes": "仅 Markdown 已有能力；Word 等其它格式未实现；区分草稿/待定/终稿由 artifact_type 承载；审核不完整（无有效 AuditRecord）须标注，不得伪装终稿",
+        "notes": "正式成稿为 Markdown。若审核缺失、未通过，或稿件内容已经改动，先审核当前稿件再导出。",
     },
     "cw-status": {
         "name": "/cw-status",

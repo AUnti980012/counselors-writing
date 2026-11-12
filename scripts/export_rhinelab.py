@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
+
+from core.atomic import atomic_write_bytes, atomic_write_json
 
 # 相对本脚本的仓库根（scripts/ 的上一级）
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -28,8 +29,7 @@ KNOWLEDGE = REPO_ROOT / "data" / "knowledge"
 FALLBACK_URL = "https://github.com/AUnti980012/counselors-writing"
 
 # 默认输出到 RhineLabUI 的 content/archives.json
-DEFAULT_OUT = Path(
-    "/Users/xinyuang/Desktop/莱茵生命-1/RhineLabUI-main/content/archives.json")
+DEFAULT_OUT = REPO_ROOT / "visualization" / "rhinelab" / "content" / "archives.json"
 
 CATEGORIES = ["案例档案", "选题档案", "来源档案", "审核档案", "风格档案"]
 
@@ -303,11 +303,10 @@ def main() -> int:
     if out_path.exists():
         backup = out_path.with_suffix(".json.orig")
         if not backup.exists():
-            out_path.replace(backup)
+            atomic_write_bytes(backup, out_path.read_bytes())
             print(f"已备份原档案 → {backup}")
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(out_path, content)
     print(f"已生成 {len(content['records'])} 份档案 → {out_path}")
     return 0
 

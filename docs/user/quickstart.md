@@ -64,7 +64,7 @@ python scripts/kb.py write --mapping <mapping_id> --llm-cmd "<你的 LLM 命令>
 python scripts/kb.py punctuation --lang zh 正文.md
 # 去 AI 味门禁（确定性，零 LLM；--fix 输出自动修后的文本）
 python scripts/kb.py deai 正文.md
-# 单通道七项思政自查
+# 八项思政自查（同时检查标点和 AI 痕迹）
 python scripts/kb.py audit --draft <draft_id> --llm-cmd "<你的 LLM 命令>"
 ```
 
@@ -72,7 +72,7 @@ python scripts/kb.py audit --draft <draft_id> --llm-cmd "<你的 LLM 命令>"
 
 ```bash
 python scripts/kb.py output render --draft <draft_id> --audit <audit_id>
-# --audit 把审核 id 写进 final_output 血缘（audited output 应带）；加 --content 直接打印正文
+# 必须提供当前草稿已通过的审核。改稿后重新审核。加 --content 直接打印正文。
 ```
 
 ---
