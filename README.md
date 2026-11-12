@@ -4,7 +4,7 @@
 
 把高校辅导员的日常工作素材——一次谈心谈话、一场班会、一个学生事件——写成有传播力的公众号推文，并沉淀成越用越懂学校、越用越懂学生的案例库。
 
-> **不想读技术文档？** 直接看 [`使用说明.md`](使用说明.md)（通俗版，5 分钟上手）。
+> 第一次写推文可以从[图解使用说明](使用说明.md)开始，里面有可直接复制到聊天里的写作示例。
 
 ## 它是什么
 
@@ -67,7 +67,7 @@ python scripts/kb.py output render --draft <draft_id> --audit <audit_id>
 | 报媒文风仿写 | `references/style-library.md` |
 | 思政质检 | `references/ideological-review.md` + `kb.py audit` |
 | 传播复盘沉淀 | `references/dissemination-review.md` |
-| 查看知识库可视化 | `/database-check`（`python scripts/database_check.py`，打开 RhineLabUI 档案阵列） |
+| 查看知识库可视化 | [RhineLabUI 本地档案阵列](visualization/rhinelab/README.md)（`python scripts/database_check.py`） |
 
 ## 没有某个兄弟 skill 时怎么办
 

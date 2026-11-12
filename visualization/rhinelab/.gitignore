@@ -1,0 +1,5 @@
+/node_modules/
+/dist/
+/content/archives.json
+/content/archives.json.orig
+/.database-check.dev.log

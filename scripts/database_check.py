@@ -21,28 +21,26 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-# 与 export_rhinelab.py 同目录，直接复用其输出路径推导 RhineLabUI 根目录，
-# 避免两处硬编码漂移。
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from export_rhinelab import DEFAULT_OUT  # noqa: E402
+from export_rhinelab import DEFAULT_OUT
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXPORT_SCRIPT = REPO_ROOT / "scripts" / "export_rhinelab.py"
 RHINELAB_DIR = DEFAULT_OUT.parent.parent
-DEFAULT_URL = "http://127.0.0.1:5173"
 
 
-def _export() -> int:
+def _export(rhinelab_dir: Path) -> int:
     print("1/3 导出知识库 → archives.json ...", flush=True)
     return subprocess.run(
-        [sys.executable, str(EXPORT_SCRIPT)], cwd=str(REPO_ROOT)
+        [sys.executable, str(EXPORT_SCRIPT), "--out",
+         str(rhinelab_dir / "content" / "archives.json")],
+        cwd=str(REPO_ROOT),
     ).returncode
 
 
 def _server_alive(url: str) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=1.5) as resp:
-            return resp.status < 500
+            return b"RHINE LAB" in resp.read(8192)
     except Exception:
         return False
 
@@ -52,7 +50,7 @@ def _start_server(rhinelab_dir: Path, port: int) -> None:
     log = rhinelab_dir / ".database-check.dev.log"
     with open(log, "ab") as out:
         subprocess.Popen(
-            ["npm", "run", "dev", "--", "--port", str(port)],
+            ["npm", "run", "dev", "--", "--port", str(port), "--strictPort"],
             cwd=str(rhinelab_dir),
             stdout=out,
             stderr=subprocess.STDOUT,
@@ -76,16 +74,22 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--rhinelab-dir",
         default=str(RHINELAB_DIR),
-        help="RhineLabUI 目录（默认取 export_rhinelab.DEFAULT_OUT 的上级）",
+        help="RhineLabUI 目录（默认使用仓库内置副本）",
     )
     parser.add_argument("--port", type=int, default=5173, help="dev server 端口（默认 5173）")
     parser.add_argument("--no-open", action="store_true", help="只导出与启动，不打开浏览器")
     args = parser.parse_args(argv)
 
-    rhinelab_dir = Path(args.rhinelab_dir)
+    rhinelab_dir = Path(args.rhinelab_dir).expanduser().resolve()
+    if not (rhinelab_dir / "package.json").is_file():
+        print(f"找不到 RhineLabUI 项目：{rhinelab_dir}", file=sys.stderr)
+        return 1
+    if not (rhinelab_dir / "node_modules").is_dir():
+        print(f"请先运行 npm ci --prefix \"{rhinelab_dir}\"", file=sys.stderr)
+        return 1
     url = f"http://127.0.0.1:{args.port}"
 
-    code = _export()
+    code = _export(rhinelab_dir)
     if code != 0:
         print("导出失败：请查看 export_rhinelab.py 输出。", file=sys.stderr)
         return code

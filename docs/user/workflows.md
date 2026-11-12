@@ -11,7 +11,7 @@ ingest（素材 → document）
   ↓ extract --extractor case_facts（→ Case）
   ↓ mapping --case <id> --profile pro-school（→ Mapping）
   ↓ write --mapping <id>（→ Draft）
-  ↓ punctuation + audit（标点门禁 + 七项思政自查）
+  ↓ punctuation + deai + audit（标点、去 AI 痕迹与八项思政自查）
   ↓ output render --audit <audit_id>（→ 最终 Markdown，血缘关联 audit）
   ↓ case add / style add（复盘沉淀：有增量才做，不阻塞交付）
 ```
@@ -33,7 +33,7 @@ python scripts/kb.py hotlist weibo --top 20    # 微博热搜
 python scripts/kb.py hotlist tophub --top 20   # 聚合多榜
 ```
 
-找「热点 × 学生工作」真实接口，不强蹭。方法见 `references/hot-trend.md`。
+先查原始来源，确认热点与学生确实相关。使用 `kb.py hot link --topic <topic_id> --hot <ref>` 把筛查结果绑定到选题。通过的条目可继续，谨慎使用的条目要在选题中记录限制。方法见 `references/hot-trend.md`。
 
 ## 3. 传播复盘 → 沉淀
 

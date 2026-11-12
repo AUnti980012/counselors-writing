@@ -1,0 +1,23 @@
+{
+  "name": "rhine-lab-analysis-os",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/patch-rolling-number.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc && vite build",
+    "check:content": "node --test scripts/check-content.mjs"
+  },
+  "dependencies": {
+    "@kitlangton/rolling-number": "0.4.1",
+    "three": "^0.183.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.183.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}
