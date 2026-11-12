@@ -1,6 +1,6 @@
 # Counselors-Writing（辅导员爆款文章）
 
-> **v3.3.0** — Skill `3.3.0` / KB `1.2.0` / Schema `1.2.0` / DB `3`。出稿审核硬门禁（`output render --audit` 必填）、热点关卡统一（`kb.py hotlist` 附筛查 + `hot link` + `write --topic` 门禁）、审核/提取截断 fail-closed。
+> **v3.4.0** — Skill `3.4.0` / KB `1.2.0` / Schema `1.2.0` / DB `3`。内置 RhineLabUI 本地档案可视化，新增图解使用说明。
 
 把高校辅导员的日常工作素材——一次谈心谈话、一场班会、一个学生事件——写成有传播力的公众号推文，并沉淀成越用越懂学校、越用越懂学生的案例库。
 
